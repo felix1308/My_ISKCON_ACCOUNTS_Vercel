@@ -1,0 +1,38 @@
+{
+  "name": "myiskcon-accounts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MyISKCON Accounts - Temple Donation Management System (Vercel + Postgres)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx scripts/migrate-from-json.ts",
+    "db:push": "tsx scripts/db-push.ts"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "bcryptjs": "3.0.3",
+    "next": "16.3.0",
+    "razorpay": "2.9.8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.10.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.49",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.19.2",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

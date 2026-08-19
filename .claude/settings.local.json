@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(python3 merge_2025_26.py)",
+      "Bash(python3 import_transactions.py --url https://script.google.com/macros/s/AKfycbyVAuEfk2a6Lepa6AyAZfItEyzs2VSnwFhI3qMFeGX9cwApXDEcoyxF1rTO2PN4CKwv/exec --session sess_1777722496735_0ecf5qlwbyrv --chunk 50)",
+      "Bash(# Find functions in Code.gs that are NEVER called from anywhere in Code.gs itself *)",
+      "Read(//tmp/**)",
+      "Bash(awk '/^function [a-zA-Z]/{if\\(fname\\) print NR-start, fname; fname=$2; start=NR} END{if\\(fname\\) print NR-start+1, fname}' \"/Users/venugopal/Iskcon Accounts Projects/MyISKCONAccounts_googleSheets/Code.gs\")",
+      "Bash(awk '/<style/,/<\\\\/style>/' \"/Users/venugopal/Iskcon Accounts Projects/MyISKCONAccounts_googleSheets/myiskcon.html\")",
+      "Bash(python3 -c \"import openpyxl; print\\('openpyxl available'\\)\")",
+      "Bash(python3 -c \"import pandas; print\\('pandas available'\\)\")",
+      "Bash(python3)",
+      "Read(//private/tmp/**)",
+      "Bash(node -e ' *)",
+      "Bash(python3 -c \"import xlrd; print\\('xlrd available'\\)\")",
+      "Bash(pip3 list *)",
+      "Bash(python3 -c \"import openpyxl; print\\('openpyxl ok'\\)\")",
+      "Bash(pip3 install *)",
+      "Bash(python3 -)",
+      "Bash(python3 parse_donor_login_2025_26.py --dry-run)",
+      "Bash(python3 parse_donor_login_2025_26.py)",
+      "Bash(python3 patch_10be_urls.py --dry-run)",
+      "Bash(python3 patch_10be_urls.py)",
+      "Bash(python3 import_transactions.py --url https://script.google.com/macros/s/AKfycbyVAuEfk2a6Lepa6AyAZfItEyzs2VSnwFhI3qMFeGX9cwApXDEcoyxF1rTO2PN4CKwv/exec --session sess_1782644181750_cvebr9l7ck --chunk 50 --dry-run)",
+      "Bash(python3 import_transactions.py --url https://script.google.com/macros/s/AKfycbyVAuEfk2a6Lepa6AyAZfItEyzs2VSnwFhI3qMFeGX9cwApXDEcoyxF1rTO2PN4CKwv/exec --session sess_1782644181750_cvebr9l7ck --chunk 50)",
+      "Bash(python3 export_donor_login_details.py --out \"../Donor Login Details 2025-26.xlsx\")",
+      "Bash(python3 export_donor_login_details.py --with-mobile-only --out \"../Donor Login Details 2025-26 \\(Mobile Only\\).xlsx\")",
+      "Bash(python3 fix_kalaburgi_names.py --dry-run)",
+      "Bash(python3 fix_kalaburgi_names.py)",
+      "Bash(awk '{print \"Running - PID:\",$2}')",
+      "Bash(kill 12689)"
+    ]
+  }
+}

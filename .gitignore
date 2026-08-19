@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# Vercel
+.ver/
+
+# Env / secrets — NEVER commit
+.env
+.env.*
+.env.example
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# ---- PII / donor data — NEVER commit ----
+# Excel exports contain donor PAN/email/mobile (PII)
+*.xlsx
+# JSON exports of donors/transactions (PII)
+scripts/donors_with_transactions.json
+scripts/donors_with_transactions.json.bak
+scripts/new_donors_2025_26.json
+scripts/new_donors_2025_26_imported.json
+scripts/new_donors_2025_26_imported.json.bak
+scripts/donors_import.json
+
+# ---- Legacy Google Apps Script files ----
+# These still contain a LIVE Razorpay key secret in plaintext.
+# Keep them locally as reference, but DO NOT commit until the key is rotated
+# and the secret is removed. See VERCEL_DEPLOYMENT.md.
+Code.gs
+myiskcon.html
+donor-guide.html
+ten_be_composite_map.js
+ten_be_multifield_map.js
+ten_be_voucher_map.js
+
+# Python migration helpers (not part of the Vercel app)
+scripts/__pycache__/
+scripts/*.py
+scripts/requirements-import.txt
