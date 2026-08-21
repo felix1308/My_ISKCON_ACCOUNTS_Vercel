@@ -15,7 +15,7 @@
 - **Encryption:** AES-256-GCM for PAN/email/gateway secrets at rest
 - **Payments:** Razorpay (server-side order creation + HMAC-SHA256 payment verification)
 - **WhatsApp:** bhashsms.com API (env-var credentials)
-- **Cron:** Vercel Cron hourly session cleanup at `/api/cron/cleanup`
+- **Cron:** Vercel Cron daily session cleanup at `/api/cron/cleanup` (daily is the max on the Hobby plan)
 
 ## Payment Routing (decided Aug 2026)
 Gateway resolution: explicit `paymentGatewayId` → center's bank account link → env `RAZORPAY_KEY_ID` fallback (= RP ICC General).
