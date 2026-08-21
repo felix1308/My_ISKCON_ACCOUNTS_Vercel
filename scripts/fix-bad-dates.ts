@@ -3,79 +3,82 @@
 // transactions and bookings tables that were imported with garbage values
 // like "Receipt", "SJ - DONATION RECEIPT", "DONATION RECEIPT - IYF", etc.
 //
-// Run with:  npx tsx scripts/fix-bad-dates.ts
+// Run with:  npm run fix-dates
 //
-// Requires DATABASE_URL_DIRECT in .env (same as migrate / db:push).
-// Idempotent: safe to re-run — only updates rows where dates are still bad.
+// Requires DATABASE_URL_DIRECT in .env.local (same as migrate / db:push).
+// Idempotent: safe to re-run — only touches rows where dates are still bad.
+// Uses single bulk UPDATEs (one round-trip per section) so it finishes fast.
 // ============================================================================
 
 import { directSql } from "../lib/db-direct";
 import { getEnv } from "../lib/env";
 
-const VALID_DATE_RE = /^\d{4}-\d{2}-\d{2}/; // starts with YYYY-MM-DD
+const BAD_DATE = `^\\d{4}-\\d{2}-\\d{2}`; // valid dates start with YYYY-MM-DD
 
 async function main() {
   getEnv();
   const sql = directSql();
 
-  // --- Fix transactions.txn_date ---
-  const badTxns = await sql`
-    SELECT id, txn_date FROM transactions
-    WHERE txn_date != '' AND txn_date !~ '^\d{4}-\d{2}-\d{2}'
+  // --- transactions.txn_date ---
+  const txnCount = await sql`
+    SELECT count(*)::int AS n FROM transactions
+    WHERE txn_date != '' AND txn_date !~ ${BAD_DATE}
   `;
-  console.log(`Found ${badTxns.length} transactions with invalid txn_date`);
-  let txnFixed = 0;
-  for (const row of badTxns) {
-    await sql`UPDATE transactions SET txn_date = '' WHERE id = ${row.id}`;
-    txnFixed++;
-  }
-  console.log(`  Fixed ${txnFixed} transaction dates (set to empty string)`);
+  await sql`
+    UPDATE transactions SET txn_date = ''
+    WHERE txn_date != '' AND txn_date !~ ${BAD_DATE}
+  `;
+  console.log(`transactions.txn_date:   fixed ${txnCount[0]?.n ?? 0} rows`);
 
-  // --- Fix bookings.booking_date ---
-  const badBookings = await sql`
-    SELECT id, booking_date FROM bookings
-    WHERE booking_date != '' AND booking_date !~ '^\d{4}-\d{2}-\d{2}'
+  // --- bookings.booking_date ---
+  const bookingCount = await sql`
+    SELECT count(*)::int AS n FROM bookings
+    WHERE booking_date != '' AND booking_date !~ ${BAD_DATE}
   `;
-  console.log(`Found ${badBookings.length} bookings with invalid booking_date`);
-  let bookingFixed = 0;
-  for (const row of badBookings) {
-    await sql`UPDATE bookings SET booking_date = '' WHERE id = ${row.id}`;
-    bookingFixed++;
-  }
-  console.log(`  Fixed ${bookingFixed} booking dates (set to empty string)`);
+  await sql`
+    UPDATE bookings SET booking_date = ''
+    WHERE booking_date != '' AND booking_date !~ ${BAD_DATE}
+  `;
+  console.log(`bookings.booking_date:   fixed ${bookingCount[0]?.n ?? 0} rows`);
 
-  // --- Fix bookings.paid_at (e.g. "ReceiptT00:00:00.000Z") ---
-  const badPaidAt = await sql`
-    SELECT id, paid_at FROM bookings
-    WHERE paid_at != '' AND paid_at !~ '^\d{4}-\d{2}-\d{2}'
+  // --- bookings.paid_at (e.g. "ReceiptT00:00:00.000Z") ---
+  const paidAtCount = await sql`
+    SELECT count(*)::int AS n FROM bookings
+    WHERE paid_at != '' AND paid_at !~ ${BAD_DATE}
   `;
-  console.log(`Found ${badPaidAt.length} bookings with invalid paid_at`);
-  let paidAtFixed = 0;
-  for (const row of badPaidAt) {
-    await sql`UPDATE bookings SET paid_at = '' WHERE id = ${row.id}`;
-    paidAtFixed++;
-  }
-  console.log(`  Fixed ${paidAtFixed} paid_at values (set to empty string)`);
+  await sql`
+    UPDATE bookings SET paid_at = ''
+    WHERE paid_at != '' AND paid_at !~ ${BAD_DATE}
+  `;
+  console.log(`bookings.paid_at:        fixed ${paidAtCount[0]?.n ?? 0} rows`);
 
-  // --- Fix bookings.items JSONB (bookingDate inside items array) ---
-  const badItems = await sql`
-    SELECT id, items FROM bookings
-    WHERE items::text ~ '"bookingDate"\s*:\s*"[^"0-9]'
+  // --- bookings.items JSONB: blank bad bookingDate inside each item ---
+  // (exclude already-blanked '' values so reruns report 0)
+  const itemsCount = await sql`
+    SELECT count(*)::int AS n FROM bookings
+    WHERE EXISTS (
+      SELECT 1 FROM jsonb_array_elements(items) AS e
+      WHERE e->>'bookingDate' IS NOT NULL AND e->>'bookingDate' != '' AND e->>'bookingDate' !~ ${BAD_DATE}
+    )
   `;
-  console.log(`Found ${badItems.length} bookings with invalid bookingDate inside items JSONB`);
-  let itemsFixed = 0;
-  for (const row of badItems) {
-    const items = (row.items as Array<Record<string, unknown>>).map((item) => {
-      const bd = String(item.bookingDate ?? "");
-      if (bd && !VALID_DATE_RE.test(bd)) {
-        return { ...item, bookingDate: "" };
-      }
-      return item;
-    });
-    await sql`UPDATE bookings SET items = ${JSON.stringify(items)}::jsonb WHERE id = ${row.id}`;
-    itemsFixed++;
-  }
-  console.log(`  Fixed ${itemsFixed} booking items JSONB`);
+  await sql`
+    UPDATE bookings
+    SET items = (
+      SELECT jsonb_agg(
+        CASE
+          WHEN elem->>'bookingDate' IS NOT NULL AND elem->>'bookingDate' != '' AND elem->>'bookingDate' !~ ${BAD_DATE}
+          THEN jsonb_set(elem, '{bookingDate}', '""')
+          ELSE elem
+        END
+      )
+      FROM jsonb_array_elements(items) AS elem
+    )
+    WHERE EXISTS (
+      SELECT 1 FROM jsonb_array_elements(items) AS e
+      WHERE e->>'bookingDate' IS NOT NULL AND e->>'bookingDate' != '' AND e->>'bookingDate' !~ ${BAD_DATE}
+    )
+  `;
+  console.log(`bookings.items JSONB:    fixed ${itemsCount[0]?.n ?? 0} rows`);
 
   console.log("\nDone!");
 }
