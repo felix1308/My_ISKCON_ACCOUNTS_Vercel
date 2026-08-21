@@ -21,6 +21,7 @@ import { encrypt, decrypt } from "../crypto";
 import { hashPassword, detectScheme, verifyPassword } from "../password";
 import { generateId, generateSevaId, generateCenterId, generateTempleId } from "../ids";
 import { ForbiddenError, NotFoundError } from "../errors";
+import { sendSevaReminderWhatsApp, sendDonorLoginTemplateForBooking } from "./whatsapp";
 import type { ApiResult, Permissions } from "../types";
 
 const now = () => new Date().toISOString();
@@ -174,6 +175,16 @@ export async function handleCreate(params: {
         razorpayOrderId: "", razorpayPaymentId: "", paidAt: str(record.paidAt), remarks: str(record.remarks),
         createdAt: ts,
       };
+      // Legacy behavior: on a paid booking, WhatsApp the seva reminders to the
+      // notify numbers and the donor-login template to the donor. Fire-and-forget.
+      if (paymentStatus.toLowerCase() === "paid") {
+        try {
+          await sendSevaReminderWhatsApp({ items, bookingDate: str(record.bookingDate, ts) });
+          await sendDonorLoginTemplateForBooking(String(record.donorId));
+        } catch (e) {
+          console.error("booking WhatsApp notify:", e instanceof Error ? e.message : e);
+        }
+      }
       break;
     }
 
@@ -184,21 +195,26 @@ export async function handleCreate(params: {
           ? (str(record.centerId) || "all_centers")
           : (principal.centerId || "")
       );
+      // Phone list for WhatsApp reminders. Legacy clients send the CSV in
+      // notifyWhatsapp; new clients can use notifyNumbers.
+      const notifyNumbers = str(record.notifyNumbers)
+        || (typeof record.notifyWhatsapp === "string" ? str(record.notifyWhatsapp) : "");
       await sql`
         INSERT INTO sevas
           (id, name, description, amount, center_id, is_active, darshan_qr, seva_qr,
-           prasadam_qr, notify_whatsapp, created_at, updated_at)
+           prasadam_qr, notify_whatsapp, notify_numbers, created_at, updated_at)
         VALUES
           (${sevaId}, ${str(record.name)}, ${str(record.description)},
            ${num(record.amount)}, ${centerId || null}, TRUE,
            ${str(record.darshanQR)}, ${str(record.sevaQR)}, ${str(record.prasadamQR)},
-           ${bool(record.notifyWhatsapp)}, ${ts}, ${ts})
+           ${bool(record.notifyWhatsapp)}, ${notifyNumbers}, ${ts}, ${ts})
       `;
       newRecord = {
         type, __backendId: sevaId, id: sevaId, name: record.name,
         description: str(record.description), amount: num(record.amount),
         centerId, darshanQR: str(record.darshanQR), sevaQR: str(record.sevaQR),
         prasadamQR: str(record.prasadamQR), notifyWhatsapp: bool(record.notifyWhatsapp),
+        notifyNumbers,
         createdAt: ts,
       };
       break;
@@ -437,6 +453,11 @@ export async function handleUpdate(params: {
           seva_qr = COALESCE(${str(record.sevaQR) || null}, seva_qr),
           prasadam_qr = COALESCE(${str(record.prasadamQR) || null}, prasadam_qr),
           notify_whatsapp = COALESCE(${record.notifyWhatsapp == null ? null : bool(record.notifyWhatsapp)}, notify_whatsapp),
+          notify_numbers = COALESCE(${
+            record.notifyNumbers != null
+              ? str(record.notifyNumbers)
+              : (typeof record.notifyWhatsapp === "string" ? str(record.notifyWhatsapp) : null)
+          }, notify_numbers),
           updated_at = ${ts}
         WHERE id = ${id}
       `;

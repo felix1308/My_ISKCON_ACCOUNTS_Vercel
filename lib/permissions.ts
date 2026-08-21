@@ -58,6 +58,12 @@ export async function checkPermission(
     return action === "read" && (type === "booking" || type === "eventBooking");
   }
 
+  // Dept staff can manage events/eventBookings for their department
+  // (department-level scoping is enforced in lib/handlers/events.ts).
+  if (p.role === "dept_staff") {
+    return type === "event" || type === "eventBooking";
+  }
+
   // Center scoping.
   if (resourceCenterId && resourceCenterId !== "all_centers") {
     const allowed = await getAllowedCenterIdsForUser(p);

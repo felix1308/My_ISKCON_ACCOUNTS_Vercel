@@ -140,6 +140,10 @@ CREATE TABLE IF NOT EXISTS sevas (
   seva_qr          TEXT NOT NULL DEFAULT '',
   prasadam_qr      TEXT NOT NULL DEFAULT '',
   notify_whatsapp  BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Comma-separated phone numbers (pujari/cook) that receive a WhatsApp
+  -- reminder when a paid booking includes this seva. Port of the legacy
+  -- notifyWhatsapp CSV field (see scripts/apply-notify-numbers.sql).
+  notify_numbers   TEXT NOT NULL DEFAULT '',
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -288,6 +292,25 @@ CREATE TABLE IF NOT EXISTS qr_scans (
   scanned_by  TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_qr_scans_booking ON qr_scans(booking_id);
+
+-- ---------------------------------------------------------------------------
+-- 10BE records (Drive URL lookup for 80G/10BE receipts)
+--   pan stored uppercase; voucher_no matched case-insensitively (trimmed).
+--   txn_date normalized to YYYY-MM-DD. amount in INR.
+--   Imported from the legacy ten_be_*_map.js files via scripts/import-tenbe.ts.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ten_be_records (
+  id          BIGSERIAL PRIMARY KEY,
+  pan         TEXT NOT NULL DEFAULT '',
+  voucher_no  TEXT NOT NULL DEFAULT '',
+  txn_date    TEXT NOT NULL DEFAULT '',       -- YYYY-MM-DD
+  amount      NUMERIC(12,2) NOT NULL DEFAULT 0,
+  url         TEXT NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (voucher_no, url)
+);
+CREATE INDEX IF NOT EXISTS idx_ten_be_voucher ON ten_be_records(voucher_no);
+CREATE INDEX IF NOT EXISTS idx_ten_be_pan ON ten_be_records(pan);
 
 -- ---------------------------------------------------------------------------
 -- Sessions

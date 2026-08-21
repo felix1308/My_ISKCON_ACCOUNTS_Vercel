@@ -24,8 +24,12 @@ function ipFrom(req: Request): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
 }
 function canManageEvents(p: Principal): boolean {
-  return p.role === "developer" || p.role === "superadmin" || p.role === "admin";
+  // Port of Code.gs canManageEvents: dept_staff can manage events for their
+  // own department; admin/superadmin/developer can manage all events.
+  return p.role === "developer" || p.role === "superadmin" || p.role === "admin" || p.role === "dept_staff";
 }
+const isDeptStaff = (p: Principal) => p.role === "dept_staff";
+const deptOf = (p: Principal) => (p.departmentId ?? "").trim();
 const num = (v: unknown, d = 0) => {
   const n = typeof v === "number" ? v : parseFloat(String(v ?? ""));
   return Number.isFinite(n) ? n : d;
@@ -65,14 +69,18 @@ export async function handleCreateEvent(params: {
   ipAddress?: string;
 }, req: Request): Promise<ApiResult> {
   const principal = await resolvePrincipal(params.sessionId);
-  if (!canManageEvents(principal)) throw new ForbiddenError("Only admins can create events");
+  if (!canManageEvents(principal)) {
+    throw new ForbiddenError("Permission denied. Only dept staff or admins can create events.");
+  }
   const r = params.record ?? {};
   if (!str(r.title)) return { isOk: false, error: "Event title is required" };
   if (!str(r.eventDate)) return { isOk: false, error: "Event date is required" };
 
   const id = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const ts = new Date().toISOString();
-  const departmentId = str(r.departmentId) || (principal.departmentId ?? "") || "";
+  // Dept staff: force departmentId to their own department.
+  let departmentId = str(r.departmentId) || (principal.departmentId ?? "") || "";
+  if (isDeptStaff(principal)) departmentId = deptOf(principal);
   const centerId = str(r.centerId) || principal.centerId || "";
 
   await sql`
@@ -108,6 +116,13 @@ export async function handleUpdateEvent(params: {
   const existing = await sqlOne<{ department_id: string | null }>`SELECT department_id FROM events WHERE id = ${id}`;
   if (!existing) throw new NotFoundError("Event not found");
 
+  // Dept staff can only edit their own department's events.
+  if (isDeptStaff(principal) && (existing.department_id ?? "") !== deptOf(principal)) {
+    return { isOk: false, error: "You can only edit events belonging to your department" };
+  }
+
+  // departmentId / centerId are immutable on update (matches legacy behavior —
+  // the UPDATE below intentionally never touches department_id / center_id).
   const ts = new Date().toISOString();
   await sql`
     UPDATE events SET
@@ -141,6 +156,14 @@ export async function handleDeleteEvent(params: {
   const r = params.record ?? {};
   const id = str(r.id ?? r.__backendId);
   if (!id) return { isOk: false, error: "Event ID is required" };
+  // Dept staff: check ownership.
+  if (isDeptStaff(principal)) {
+    const existing = await sqlOne<{ department_id: string | null }>`SELECT department_id FROM events WHERE id = ${id}`;
+    if (!existing) throw new NotFoundError("Event not found");
+    if ((existing.department_id ?? "") !== deptOf(principal)) {
+      return { isOk: false, error: "You can only delete events belonging to your department" };
+    }
+  }
   await sql`UPDATE events SET is_active = FALSE, updated_at = now() WHERE id = ${id}`;
   await addAuditLog({ userId: principal.backendId, username: principal.username,
     action: "DELETE_EVENT", resourceType: "event", resourceId: id, ipAddress: params.ipAddress ?? ipFrom(req) });
@@ -288,6 +311,16 @@ export async function handleGetEventBookings(params: { sessionId?: string }, req
       SELECT id, event_id, donor_id, quantity, total_amount, payment_status, payment_mode,
              razorpay_order_id, razorpay_payment_id, paid_at, remarks, booked_by, center_id, created_at
       FROM event_bookings WHERE donor_id = ${principal.donorId}
+    `;
+  } else if (isDeptStaff(principal)) {
+    // Dept staff see bookings only for events belonging to their department.
+    rows = await sql`
+      SELECT eb.id, eb.event_id, eb.donor_id, eb.quantity, eb.total_amount, eb.payment_status,
+             eb.payment_mode, eb.razorpay_order_id, eb.razorpay_payment_id, eb.paid_at,
+             eb.remarks, eb.booked_by, eb.center_id, eb.created_at
+      FROM event_bookings eb
+      JOIN events e ON e.id = eb.event_id
+      WHERE e.department_id = ${deptOf(principal)}
     `;
   } else {
     rows = await sql`

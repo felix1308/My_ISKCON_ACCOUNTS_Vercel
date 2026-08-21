@@ -20,6 +20,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <script src="https://checkout.razorpay.com/v1/checkout.js" async />
+        <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" async />
       </head>
       <body className="h-full bg-theme-page">
         <AuthProvider>{children}</AuthProvider>

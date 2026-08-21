@@ -10,7 +10,7 @@
 import { sql, sqlTyped } from "../db";
 import { getEnv } from "../env";
 import { resolvePrincipal, type Principal } from "../context";
-import type { ApiResult, Booking } from "../types";
+import type { ApiResult } from "../types";
 
 const DONOR_LOGIN_TEMPLATE = "donor_login_202526b";
 
@@ -148,38 +148,64 @@ export async function sendDonorLoginWhatsApp(params: {
   return sendWhatsAppMessageInternal(fullPhone, DONOR_LOGIN_TEMPLATE, donorName, donorName);
 }
 
+/** Format a date like the legacy Apps Script: "5 Jan 2026" (en-IN). */
+function fmtSevaDate(d: string): string {
+  try {
+    return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return d;
+  }
+}
+
 /**
  * Send pujari/cook reminders for a freshly-paid booking. Reads the seva's
- * notifyWhatsapp field for each line item and combines all lines per phone.
- * Best-effort — never throws (called from the booking create flow).
+ * notify_numbers CSV for each line item and combines all lines per phone —
+ * one message per number: "ISKCON Seva reminder: <seva> - Qty: N for <date>. ..."
+ * Best-effort — never throws (called from the booking create / verify flows).
  */
-export async function sendSevaReminderWhatsApp(booking: Pick<Booking, "items" | "bookingDate">): Promise<void> {
+export async function sendSevaReminderWhatsApp(booking: { items: unknown; bookingDate?: string }): Promise<void> {
   try {
-    const items = booking.items;
+    let items = booking.items;
+    if (typeof items === "string") {
+      try { items = JSON.parse(items); } catch { return; }
+    }
     if (!Array.isArray(items) || items.length === 0) return;
-    const sevas = await sqlTyped<{ id: string; notify_whatsapp: boolean }>`SELECT id, notify_whatsapp FROM sevas`;
-    const sevaMap = new Map(sevas.map((s) => [s.id, s.notify_whatsapp]));
 
+    const sevas = await sqlTyped<{ id: string; notify_numbers: string }>`
+      SELECT id, notify_numbers FROM sevas WHERE notify_numbers <> ''
+    `;
+    const sevaMap = new Map(sevas.map((s) => [s.id, s.notify_numbers]));
+
+    const bookingDate = String(booking.bookingDate ?? "") || new Date().toISOString().split("T")[0];
     const byPhone = new Map<string, string[]>();
-    const bookingDate = booking.bookingDate || new Date().toISOString().split("T")[0];
-    for (const item of items) {
+    for (const raw of items) {
+      const item = (raw ?? {}) as Record<string, unknown>;
       const sevaId = String(item.sevaId ?? item.id ?? "");
       const name = String(item.name ?? "Seva");
-      const qty = Number(item.quantity ?? 1);
-      const itemDate = String(item.bookingDate ?? bookingDate);
+      const qty = Number(item.quantity ?? 1) || 1;
+      const itemDate = fmtSevaDate(String(item.bookingDate ?? "") || bookingDate);
       const line = `${name} - Qty: ${qty} for ${itemDate}`;
-      const notify = sevaMap.get(sevaId);
-      if (!notify) continue;
-      // notify_whatsapp is a boolean in the new schema; phone numbers are stored
-      // on the seva's darshan_qr/seva_qr/prasadam_qr fields per legacy behavior.
-      // For now we only support a boolean flag; per-phone routing can be added
-      // when the seva schema gains a dedicated phone column.
-      void line;
+      const notifyRaw = String(sevaMap.get(sevaId) ?? "").trim();
+      if (!notifyRaw) continue;
+      const numbers = notifyRaw
+        .split(",")
+        .map((n) => n.trim().replace(/\D/g, ""))
+        .filter((n) => n.length >= 10);
+      for (const n of numbers) {
+        const arr = byPhone.get(n) ?? [];
+        arr.push(line);
+        byPhone.set(n, arr);
+      }
     }
-    // The legacy implementation used seva.notifyWhatsapp as a CSV of phone numbers.
-    // In the new schema that field is a boolean, so per-phone routing is deferred
-    // until the seva table is extended. We keep the hook so the booking flow can
-    // call it without breaking.
+
+    const prefix = "ISKCON Seva reminder: ";
+    let first = true;
+    for (const [phone, lines] of byPhone) {
+      if (!first) await new Promise((r) => setTimeout(r, 150)); // throttle
+      first = false;
+      const res = await sendWhatsAppMessageInternal(to91(phone), prefix + lines.join(". "));
+      if (!res.isOk) console.error("sendSevaReminderWhatsApp send failed:", phone, res.error);
+    }
   } catch (e) {
     console.error("sendSevaReminderWhatsApp:", e instanceof Error ? e.message : e);
   }

@@ -5,6 +5,7 @@ import { useAllData, byType } from "@/lib/use-all-data";
 import { useAuth } from "@/lib/auth-context";
 import { callApi } from "@/lib/client";
 import { formatDate } from "@/lib/format";
+import { loadSheetJs } from "@/lib/excel";
 
 interface DonorRecord {
   __backendId: string; name: string; spiritualName: string; mobile: string;
@@ -24,6 +25,7 @@ export default function DonorsPage() {
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState({ name: "", mobile: "", whatsapp: "", email: "", pan: "", area: "", pincode: "", centerId: "", spiritualName: "", flat: "", road: "", po: "", district: "", state: "", country: "India", tallyName: "" });
   const [viewDonor, setViewDonor] = useState<DonorRecord | null>(null);
+  const [excelLoading, setExcelLoading] = useState(false);
 
   const allDonors = byType<DonorRecord>(data, "donor");
   const bookings = byType<BookingRecord>(data, "booking");
@@ -88,6 +90,50 @@ export default function DonorsPage() {
 
   const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
+  async function downloadExcel() {
+    if (donors.length === 0) { alert("No donors to download"); return; }
+    setExcelLoading(true);
+    try {
+      const XLSX = await loadSheetJs();
+      const rows = donors.map((d, idx) => {
+        const center = centers.find((c) => c.id === d.centerId);
+        return {
+          "S.No": idx + 1,
+          "Name": d.name || "",
+          "Spiritual Name": d.spiritualName || "",
+          "Mobile": d.mobile || "",
+          "WhatsApp": d.whatsapp || "",
+          "Email": d.email || "",
+          "PAN": d.pan || "",
+          "Flat / Building": d.flat || "",
+          "Road / Street": d.road || "",
+          "Post Office": d.po || "",
+          "Area": d.area || "",
+          "Pincode": d.pincode || "",
+          "District": d.district || "",
+          "State": d.state || "",
+          "Country": d.country || "",
+          "Center": center?.name || "",
+          "Tally Name": d.tallyName || "",
+        };
+      });
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws["!cols"] = [
+        { wch: 5 }, { wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 14 },
+        { wch: 26 }, { wch: 12 }, { wch: 20 }, { wch: 22 }, { wch: 15 },
+        { wch: 18 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
+        { wch: 18 }, { wch: 20 },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, "Donors");
+      XLSX.writeFile(wb, `donors_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Excel export failed");
+    } finally {
+      setExcelLoading(false);
+    }
+  }
+
   if (loading) return <div className="text-center py-12 text-theme-muted">Loading donors...</div>;
 
   return (
@@ -97,6 +143,10 @@ export default function DonorsPage() {
         <div className="flex gap-2">
           <input type="text" placeholder="Search name, mobile, PAN, tally..." value={search} onChange={(e) => setSearch(e.target.value)}
             className="px-4 py-2 border border-theme rounded-lg theme-focus text-sm w-64" />
+          <button onClick={downloadExcel} disabled={excelLoading}
+            className="text-sm px-4 py-2 border border-theme rounded-lg text-theme-secondary hover:text-theme-primary transition disabled:opacity-50">
+            {excelLoading ? "Loading Excel..." : "Excel (.xlsx)"}
+          </button>
           {canManage && <button onClick={startNew} className="btn-primary text-sm font-medium px-4 py-2 rounded-lg">+ Add Donor</button>}
         </div>
       </div>

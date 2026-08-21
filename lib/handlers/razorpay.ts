@@ -15,6 +15,7 @@ import { getEnv } from "../env";
 import { decrypt } from "../crypto";
 import { resolvePrincipal } from "../context";
 import { addAuditLog } from "../audit";
+import { sendSevaReminderWhatsApp, sendDonorLoginTemplateForBooking } from "./whatsapp";
 import type { ApiResult } from "../types";
 
 interface GatewayCreds { keyId: string; keySecret: string; }
@@ -158,6 +159,20 @@ export async function verifyRazorpayPayment(params: {
         paid_at = ${ts}, updated_at = ${ts}
       WHERE id = ${bookingId}
     `;
+    // Legacy behavior: the booking just became paid — WhatsApp the seva
+    // reminders to the notify numbers and the donor-login template to the
+    // donor. Fire-and-forget: never fail the payment verification.
+    try {
+      const bk = await sqlOne<{ donor_id: string; items: unknown; booking_date: string }>`
+        SELECT donor_id, items, booking_date FROM bookings WHERE id = ${bookingId} LIMIT 1
+      `;
+      if (bk) {
+        await sendSevaReminderWhatsApp({ items: bk.items, bookingDate: String(bk.booking_date ?? "") });
+        await sendDonorLoginTemplateForBooking(String(bk.donor_id ?? ""));
+      }
+    } catch (e) {
+      console.error("verifyRazorpayPayment WhatsApp notify:", e instanceof Error ? e.message : e);
+    }
   }
 
   await addAuditLog({

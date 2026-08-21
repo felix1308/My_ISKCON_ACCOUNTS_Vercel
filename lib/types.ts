@@ -3,7 +3,16 @@
 // React frontend and the API layer speak the same shape.
 // ============================================================================
 
-export type Role = "superadmin" | "admin" | "volunteer" | "donor" | "developer";
+export type Role =
+  | "superadmin"
+  | "admin"
+  | "volunteer"
+  | "donor"
+  | "developer"
+  | "dept_staff"
+  | "EntryScanner"
+  | "SevaScanner"
+  | "PrasadamScanner";
 
 export interface Permissions {
   view_dashboard?: boolean;
@@ -147,6 +156,8 @@ export interface Seva {
   sevaQR: string;
   prasadamQR: string;
   notifyWhatsapp: boolean;
+  /** Comma-separated phone numbers that get a WhatsApp reminder on paid bookings. */
+  notifyNumbers: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -7,7 +7,7 @@ import { callApi } from "@/lib/client";
 
 interface DonorRecord {
   __backendId: string; name: string; spiritualName: string; tallyName: string;
-  mobile: string; centerId: string;
+  mobile: string; whatsapp: string; centerId: string;
 }
 interface BookingRecord { donorId: string; totalAmount: number; paymentStatus: string; }
 
@@ -52,8 +52,11 @@ export default function DonorLoginsPage() {
     setSendStatus(result.isOk ? "Sent successfully!" : ((result as { error?: string }).error || "Failed"));
   }
 
-  async function sendSingle(donorId: string) {
-    const result = await callApi("sendDonorLoginWhatsApp", { donorId });
+  async function sendSingle(donor: DonorRecord) {
+    const result = await callApi("sendDonorLoginWhatsApp", {
+      phone: donor.whatsapp || donor.mobile,
+      name: donor.name,
+    });
     if (!result.isOk) alert((result as { error?: string }).error || "Failed");
   }
 
@@ -66,6 +69,21 @@ export default function DonorLoginsPage() {
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "donor_logins.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Bulk-upload format for bhashsms.com: mobile,var1,var2 (91-prefixed mobile, name twice)
+  function downloadBhashSMSCSV() {
+    const rows = [["mobile", "var1", "var2"]];
+    for (const d of filtered) {
+      const mobile10 = String(d.mobile || "").replace(/\D/g, "").slice(-10);
+      if (!/^\d{10}$/.test(mobile10)) continue;
+      rows.push([`91${mobile10}`, d.name || "", d.name || ""]);
+    }
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "bhashsms_upload.csv"; a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -82,6 +100,7 @@ export default function DonorLoginsPage() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <button onClick={downloadCSV} className="text-sm px-3 py-2 border border-theme rounded-lg text-theme-secondary hover:text-theme-primary">Download CSV</button>
+            <button onClick={downloadBhashSMSCSV} className="text-sm px-3 py-2 border border-theme rounded-lg text-theme-secondary hover:text-theme-primary">BhashSMS CSV</button>
             <button onClick={sendBulkWhatsApp} disabled={sendingAll} className="btn-primary text-sm px-3 py-2 rounded-lg">{sendingAll ? "Sending..." : "Send via BhashSMS"}</button>
           </div>
         </div>
@@ -129,7 +148,7 @@ export default function DonorLoginsPage() {
                     <td className="px-3 py-2 text-theme-secondary font-mono text-xs">{d.name}</td>
                     <td className="px-3 py-2 text-right text-theme-primary">₹{(donorStats.get(d.__backendId) || 0).toLocaleString("en-IN")}</td>
                     <td className="px-3 py-2">
-                      <button onClick={() => sendSingle(d.__backendId)} className="text-xs text-theme-accent hover:underline">Send WhatsApp</button>
+                      <button onClick={() => sendSingle(d)} className="text-xs text-theme-accent hover:underline">Send WhatsApp</button>
                     </td>
                   </tr>
                 ))}

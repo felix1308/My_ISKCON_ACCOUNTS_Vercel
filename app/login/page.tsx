@@ -80,10 +80,17 @@ export default function LoginPage() {
     setSignupLoading(true);
     try {
       const result = await callApi("selfRegister", {
-        name: signupForm.name.trim(),
-        mobile: signupForm.mobile.trim(),
-        pan: signupForm.pan.trim(),
-        email: signupForm.email.trim(),
+        record: {
+          name: signupForm.name.trim(),
+          mobile: signupForm.mobile.trim(),
+          pan: signupForm.pan.trim().toUpperCase(),
+          email: signupForm.email.trim(),
+          spiritualName: "",
+          indianPassport: true,
+          whatsapp: signupForm.mobile.trim(),
+          flat: "", road: "", po: "", area: "",
+          pincode: "", district: "", state: "", country: "India",
+        },
       });
       if (result.isOk) {
         setSignupMessage("Registration submitted! Your default password is your mobile number. An admin will approve your account.");
@@ -285,6 +292,7 @@ export default function LoginPage() {
                     onChange={(e) => setSignupForm({ ...signupForm, pan: e.target.value })}
                     className="w-full px-4 py-3 border border-theme rounded-lg theme-focus outline-none transition"
                     placeholder="ABCDE1234F"
+                    required
                   />
                 </div>
                 <div>

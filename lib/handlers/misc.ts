@@ -22,15 +22,23 @@ function ipFrom(req: Request): string {
 // VALIDATE QR  (superadmin / developer / scanner roles)
 // ---------------------------------------------------------------------------
 
+/** Allowed scanner roles: each can validate only one QR type (port of Code.gs). */
+const QR_SCANNER_ROLES: Record<string, "darshan" | "seva" | "prasadam"> = {
+  EntryScanner: "darshan",
+  SevaScanner: "seva",
+  PrasadamScanner: "prasadam",
+};
+
 export async function validateQR(params: {
   sessionId?: string;
   payload?: string;
 }, req: Request): Promise<ApiResult> {
   const principal = await resolvePrincipal(params.sessionId);
-  // Scanner roles aren't first-class in the new schema yet — restrict to
-  // superuser for now. Volunteers with booking permission can be added later.
-  if (!isSuperuserRole(principal.role)) {
-    throw new ForbiddenError("Only superadmin/developer can validate QR codes");
+  // superadmin/developer can validate any type; scanner roles only their own.
+  const isSuperuser = isSuperuserRole(principal.role);
+  const allowedTypeForScanner = QR_SCANNER_ROLES[principal.role as string];
+  if (!isSuperuser && !allowedTypeForScanner) {
+    return { isOk: false, error: "Only superadmin/developer or a scanner user (Entry/Seva/Prasadam Scanner) can validate QR codes" };
   }
   const payload = String(params.payload ?? "").trim();
   if (!payload) return { isOk: false, error: "Invalid payload" };
@@ -42,6 +50,12 @@ export async function validateQR(params: {
   if (type === "entry") type = "darshan";
   if (!["darshan", "seva", "prasadam"].includes(type)) {
     return { isOk: false, error: "Invalid type. Must be entry, seva or prasadam" };
+  }
+
+  // Scanner users can only validate their assigned QR type.
+  if (allowedTypeForScanner && type !== allowedTypeForScanner) {
+    const label = principal.role === "EntryScanner" ? "Entry" : principal.role === "SevaScanner" ? "Seva" : "Prasadam";
+    return { isOk: false, error: `This scanner accepts only ${label} QR codes. Wrong QR type.` };
   }
 
   const booking = await sqlOne<{ payment_status: string }>`SELECT payment_status FROM bookings WHERE id = ${bookingId} LIMIT 1`;

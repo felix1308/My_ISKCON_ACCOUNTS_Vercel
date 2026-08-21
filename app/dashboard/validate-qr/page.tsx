@@ -57,7 +57,7 @@ export default function ValidateQRPage() {
     ctx.drawImage(video, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    // Use jsQR if available (loaded via CDN in the original; we'll do a basic check)
+    // Use jsQR if available (loaded via CDN script in app/layout.tsx)
     const jsQR = (globalThis as unknown as { jsQR?: (data: ImageData["data"], w: number, h: number) => { data: string } | null }).jsQR;
     if (jsQR) {
       const code = jsQR(imageData.data, imageData.width, imageData.height);
@@ -73,7 +73,7 @@ export default function ValidateQRPage() {
   async function handleQRCode(qrData: string) {
     stopCamera();
     setResult({ isOk: true, message: "Validating..." });
-    const res = await callApi("validateQR", { qrData });
+    const res = await callApi("validateQR", { payload: qrData });
     setResult(res as { isOk: boolean; message?: string; error?: string });
   }
 

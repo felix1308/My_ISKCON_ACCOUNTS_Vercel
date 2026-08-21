@@ -190,7 +190,7 @@ export async function handleGetAllData(params: {
   // --- Sevas ---
   const sevaRows = await sqlTyped<RawRow>`
     SELECT id, name, description, amount, center_id, is_active, darshan_qr,
-           seva_qr, prasadam_qr, notify_whatsapp, created_at
+           seva_qr, prasadam_qr, notify_whatsapp, notify_numbers, created_at
     FROM sevas WHERE is_active = TRUE
   `;
   for (const s of sevaRows) {
@@ -208,6 +208,7 @@ export async function handleGetAllData(params: {
       sevaQR: String(s.seva_qr ?? ""),
       prasadamQR: String(s.prasadam_qr ?? ""),
       notifyWhatsapp: bool(s.notify_whatsapp),
+      notifyNumbers: String(s.notify_numbers ?? ""),
       createdAt: s.created_at,
     });
   }

@@ -48,6 +48,7 @@ import {
   handleCreateEventBooking, verifyRazorpayPaymentForEvent,
   handleCancelEventBooking, handleGetEventBookings,
 } from "@/lib/handlers/events";
+import { lookup10BeUrl } from "@/lib/handlers/tenbe";
 
 type Handler = (params: Record<string, unknown>, req: Request) => Promise<ApiResult>;
 
@@ -90,8 +91,9 @@ const handlers: Record<string, Handler> = {
   bulkImportTransactions: (p, req) => bulkImportTransactions(p, req),
   bulkPatchBookingRemarks: (p, req) => bulkPatchBookingRemarks(p, req),
 
-  // --- QR / setup ---
+  // --- QR / setup / 10BE ---
   validateQR: (p, req) => validateQR(p, req),
+  lookup10BeUrl: (p, req) => lookup10BeUrl(p, req),
   flushSevas: (p, req) => flushSevas(p, req),
   toggleSuperadminAccess: (p, req) => toggleSuperadminAccess(p, req),
 

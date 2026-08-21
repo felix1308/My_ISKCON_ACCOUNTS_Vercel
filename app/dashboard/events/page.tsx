@@ -120,15 +120,15 @@ export default function EventsPage() {
       capacity: Number(eventForm.capacity) || 0,
     };
     if (editingEvent) {
-      await callApi("updateEvent", { eventId: editingEvent.__backendId || editingEvent.id, ...payload });
+      await callApi("updateEvent", { record: { id: editingEvent.__backendId || editingEvent.id, ...payload } });
     } else {
-      await callApi("createEvent", payload);
+      await callApi("createEvent", { record: payload });
     }
     setSavingEvent(false); setShowEventForm(false); reload();
   }
   async function deleteEvent(e: EventRecord) {
     if (!confirm(`Delete event "${e.title}"?`)) return;
-    await callApi("deleteEvent", { eventId: e.__backendId || e.id });
+    await callApi("deleteEvent", { record: { id: e.__backendId || e.id } });
     reload();
   }
 
@@ -144,27 +144,112 @@ export default function EventsPage() {
     const totalAmount = price * quantity;
     try {
       if (price === 0) {
-        // Free event — book directly
+        // Free event — book directly (donors must use online mode per handler)
         const res = await callApi("createEventBooking", {
-          eventId: event.__backendId || event.id, quantity, totalAmount: 0,
-          paymentStatus: "paid", paymentMode: "free",
+          record: {
+            eventId: event.__backendId || event.id, quantity,
+            paymentStatus: "paid", paymentMode: "online",
+          },
         });
         if (!res.isOk) throw new Error((res as { error?: string }).error || "Booking failed");
+        setBookingModal(null); reload();
       } else {
-        // Paid — create pending booking
-        const res = await callApi("createEventBooking", {
-          eventId: event.__backendId || event.id, quantity, totalAmount,
-          paymentStatus: "pending", paymentMode: "online",
-        });
-        if (!res.isOk) throw new Error((res as { error?: string }).error || "Booking failed");
-        // TODO: Razorpay checkout integration
-        // For now, mark as pending — admin can update payment status
+        // Paid — pending booking + Razorpay checkout
+        await handleEventRazorpayFlow(event, quantity, totalAmount);
+        return; // bookingPaying managed inside the Razorpay flow
       }
-      setBookingModal(null); reload();
     } catch (err) {
       setBookingError(err instanceof Error ? err.message : "Booking failed");
     }
     setBookingPaying(false);
+  }
+
+  // ---- Razorpay checkout flow for paid events (mirrors bookings page) ----
+  async function handleEventRazorpayFlow(event: EventRecord, quantity: number, totalAmount: number) {
+    const RazorpayClass = (globalThis as unknown as { Razorpay?: new (opts: Record<string, unknown>) => { open: () => void } }).Razorpay;
+    if (!RazorpayClass) {
+      setBookingError("Razorpay is still loading. Please wait a moment and try again.");
+      setBookingPaying(false);
+      return;
+    }
+
+    // Step 1: Create a pending booking
+    const bookingResult = await callApi("createEventBooking", {
+      record: {
+        eventId: event.__backendId || event.id, quantity,
+        paymentStatus: "pending", paymentMode: "online",
+      },
+    });
+    if (!bookingResult.isOk) {
+      setBookingError((bookingResult as { error?: string }).error || "Failed to create booking");
+      setBookingPaying(false);
+      return;
+    }
+    const eventBookingId = (bookingResult as { data?: { __backendId?: string } }).data?.__backendId || "";
+
+    // Step 2: Create Razorpay order (amount in paise)
+    const orderResult = await callApi("createRazorpayOrder", {
+      amount: Math.round(totalAmount * 100),
+      receipt: eventBookingId,
+      currency: "INR",
+      centerId: event.centerId || undefined,
+    });
+    if (!orderResult.isOk) {
+      setBookingError((orderResult as { error?: string }).error || "Failed to create payment order");
+      setBookingPaying(false);
+      return;
+    }
+    const order = orderResult as Record<string, unknown>;
+    const paymentGatewayId = (order.paymentGatewayId as string) || "";
+
+    // Step 3: Open Razorpay checkout popup
+    setBookingPaying(false); // Allow UI interaction while popup is open
+    const donor = donors.find((d) => d.__backendId === user?.donorId);
+    const rzpOptions: Record<string, unknown> = {
+      key: order.keyId,
+      amount: order.amount,
+      order_id: order.orderId,
+      name: "ISKCON Cultural Centre",
+      description: event.title,
+      prefill: {
+        name: donor?.name || user?.username || "",
+        contact: donor?.mobile || "",
+      },
+      handler: function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
+        // Step 4: Verify payment on server
+        setBookingPaying(true);
+        setBookingError("");
+        callApi("verifyRazorpayPaymentForEvent", {
+          orderId: response.razorpay_order_id,
+          paymentId: response.razorpay_payment_id,
+          signature: response.razorpay_signature,
+          eventBookingId,
+          paymentGatewayId,
+        }).then((verifyResult) => {
+          setBookingPaying(false);
+          if (verifyResult.isOk) {
+            alert("Payment successful! Your event registration is confirmed.");
+            setBookingModal(null);
+            reload();
+          } else {
+            setBookingError((verifyResult as { error?: string }).error || "Payment verification failed. Your payment was received but booking update failed. Contact admin with Razorpay Payment ID: " + response.razorpay_payment_id);
+          }
+        }).catch((err) => {
+          setBookingPaying(false);
+          setBookingError("Payment received but verification failed: " + (err instanceof Error ? err.message : String(err)) + ". Contact admin with Payment ID: " + response.razorpay_payment_id);
+        });
+      },
+      modal: {
+        ondismiss: () => {
+          // User closed the popup without paying — booking stays as pending
+          setBookingPaying(false);
+          setBookingError("Payment cancelled. Booking saved as pending.");
+        },
+      },
+    };
+
+    const rzp = new RazorpayClass(rzpOptions);
+    rzp.open();
   }
 
   // ---- Walk-in registration ----
@@ -173,13 +258,13 @@ export default function EventsPage() {
       setWalkinError("Select an event and donor"); return;
     }
     setWalkinSaving(true); setWalkinError("");
-    const evt = events.find((e) => (e.__backendId || e.id) === walkinForm.eventId);
-    const totalAmount = (evt?.price || 0) * (Number(walkinForm.quantity) || 1);
     const res = await callApi("createEventBooking", {
-      eventId: walkinForm.eventId, donorId: walkinForm.donorId,
-      quantity: Number(walkinForm.quantity) || 1, totalAmount,
-      paymentStatus: walkinForm.paymentStatus, paymentMode: walkinForm.paymentMode,
-      remarks: walkinForm.remarks,
+      record: {
+        eventId: walkinForm.eventId, donorId: walkinForm.donorId,
+        quantity: Number(walkinForm.quantity) || 1,
+        paymentStatus: walkinForm.paymentStatus, paymentMode: walkinForm.paymentMode,
+        remarks: walkinForm.remarks,
+      },
     });
     setWalkinSaving(false);
     if (!res.isOk) { setWalkinError((res as { error?: string }).error || "Failed"); return; }
