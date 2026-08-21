@@ -42,6 +42,7 @@ async function getGatewayIdForCenter(centerId: string): Promise<string | null> {
     SELECT payment_gateway_id FROM bank_accounts
     WHERE is_active = TRUE AND payment_gateway_id IS NOT NULL AND payment_gateway_id <> ''
       AND (center_id = ${centerId} OR center_id IS NULL OR center_id = 'all_centers')
+    ORDER BY (center_id = ${centerId}) DESC, id
     LIMIT 1
   `;
   return row?.payment_gateway_id ?? null;
