@@ -17,6 +17,12 @@
 - **WhatsApp:** bhashsms.com API (env-var credentials)
 - **Cron:** Vercel Cron hourly session cleanup at `/api/cron/cleanup`
 
+## Payment Routing (decided Aug 2026)
+Gateway resolution: explicit `paymentGatewayId` → center's bank account link → env `RAZORPAY_KEY_ID` fallback (= RP ICC General).
+- Bangalore → RP ICC General; Tumkur / Koramangala / Electronic City → RP ICC Bhakti Kuteers
+- Kalaburgi / IYF / RRN / Begur → intentionally on env fallback (ICC General), no per-center routing wanted
+- `ICC_Project` and `Matchless_Gifts` gateways exist in DB but are intentionally unused — do not link or flag them
+
 ## Key Files
 - `lib/handlers/` — all backend action handlers (auth, crud, razorpay, whatsapp, bulk, events, misc)
 - `lib/permissions.ts` — center-scoped permission checks
@@ -27,5 +33,5 @@
 ## Security
 - All secrets in env vars (never in source). See `.env.example` for the full list.
 - All SQL is parameterized via Neon tagged templates — never concatenate user input.
-- `Code.gs` and `myiskcon.html` are gitignored (they contain a leaked Razorpay key that must be rotated).
-- See `VERCEL_DEPLOYMENT.md` for step-by-step deployment including key rotation.
+- `Code.gs` and `myiskcon.html` are gitignored (they contain a hardcoded Razorpay key; owner has confirmed the files were never shared — rotate only if they ever get shared or committed).
+- See `VERCEL_DEPLOYMENT.md` for step-by-step deployment.
