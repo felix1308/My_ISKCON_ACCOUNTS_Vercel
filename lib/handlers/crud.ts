@@ -74,7 +74,12 @@ export async function handleCreate(params: {
   if (!record || !record.type) return { isOk: false, error: "Record type is required" };
   const type = record.type;
   const recordCenterId = str(record.centerId);
-  await requirePermission(principal, type as ResourceType, "create", recordCenterId || undefined);
+  // Donor self-booking: donors may create ONLY their own seva bookings,
+  // online payment, always pending (paid is granted by verifyRazorpayPayment).
+  const isDonorSelfBooking = principal.role === "donor" && type === "booking";
+  if (!isDonorSelfBooking) {
+    await requirePermission(principal, type as ResourceType, "create", recordCenterId || undefined);
+  }
 
   const id = generateId();
   const ts = now();
@@ -145,11 +150,17 @@ export async function handleCreate(params: {
     }
 
     case "booking": {
-      if (!record.donorId) return { isOk: false, error: "Donor ID is required" };
+      const isDonor = principal.role === "donor";
+      const donorId = isDonor ? str(principal.donorId) : str(record.donorId);
+      if (!donorId) return { isOk: false, error: "Donor ID is required" };
+      const paymentMode = str(record.paymentMode, "online");
+      if (isDonor && paymentMode !== "online") {
+        return { isOk: false, error: "Donors can only book online. Please use online payment." };
+      }
       const centerId = fkCenter(str(record.centerId) || principal.centerId || "");
       const festivalQR = bool(record.festivalQR);
       const items = record.items ?? [];
-      const paymentStatus = str(record.paymentStatus, "pending");
+      const paymentStatus = isDonor ? "pending" : str(record.paymentStatus, "pending");
       await sql`
         INSERT INTO bookings
           (id, donor_id, items, total_amount, payment_status, payment_mode, booking_date,
@@ -157,8 +168,8 @@ export async function handleCreate(params: {
            festival_qr, razorpay_order_id, razorpay_payment_id, paid_at, remarks,
            created_at, updated_at)
         VALUES
-          (${id}, ${record.donorId}, ${JSON.stringify(items)}::jsonb,
-           ${num(record.totalAmount)}, ${paymentStatus}, ${str(record.paymentMode, "online")},
+          (${id}, ${donorId}, ${JSON.stringify(items)}::jsonb,
+           ${num(record.totalAmount)}, ${paymentStatus}, ${paymentMode},
            ${str(record.bookingDate, ts)}, ${centerId || null},
            ${str(record.collectedBy, principal.username)},
            ${fkCenter(str(record.collectedByCenter, principal.centerId))},
@@ -167,8 +178,8 @@ export async function handleCreate(params: {
            ${str(record.paidAt)}, ${str(record.remarks)}, ${ts}, ${ts})
       `;
       newRecord = {
-        type, __backendId: id, donorId: record.donorId, items,
-        totalAmount: num(record.totalAmount), paymentStatus, paymentMode: str(record.paymentMode, "online"),
+        type, __backendId: id, donorId, items,
+        totalAmount: num(record.totalAmount), paymentStatus, paymentMode,
         bookingDate: str(record.bookingDate, ts), centerId, collectedBy: str(record.collectedBy, principal.username),
         collectedByCenter: str(record.collectedByCenter, principal.centerId),
         chequeBankAccountId: str(record.chequeBankAccountId), festivalQR,
@@ -180,7 +191,7 @@ export async function handleCreate(params: {
       if (paymentStatus.toLowerCase() === "paid") {
         try {
           await sendSevaReminderWhatsApp({ items, bookingDate: str(record.bookingDate, ts) });
-          await sendDonorLoginTemplateForBooking(String(record.donorId));
+          await sendDonorLoginTemplateForBooking(donorId);
         } catch (e) {
           console.error("booking WhatsApp notify:", e instanceof Error ? e.message : e);
         }

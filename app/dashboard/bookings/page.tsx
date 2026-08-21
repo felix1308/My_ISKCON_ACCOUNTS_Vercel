@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useAllData, byType } from "@/lib/use-all-data";
 import { useAuth } from "@/lib/auth-context";
 import { callApi } from "@/lib/client";
@@ -65,6 +65,15 @@ export default function BookingsPage() {
     const q = mobileSearch.toLowerCase();
     return donors.filter((d) => d.mobile?.includes(q) || d.name?.toLowerCase().includes(q)).slice(0, 10);
   }, [mobileSearch, donors]);
+
+  // ---- Donor self-booking: auto-select own record (donors only see
+  //      themselves in getAllData, so donors[0] is their record). ----
+  useEffect(() => {
+    if (isDonor && !selectedDonorId && donors.length > 0) {
+      selectDonor(donors[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDonor, donors, selectedDonorId]);
 
   // ---- Sevas for selected center ----
   const sevasForCenter = useMemo(() => {
@@ -136,9 +145,11 @@ export default function BookingsPage() {
   // ---- Helper: reset form after successful booking ----
   function resetBookingForm() {
     setCart([]);
-    setSelectedDonorId("");
-    setDonorForm({ name: "", spiritualName: "", indianPassport: false, pan: "", tallyName: "", mobile: "", whatsapp: "", email: "", flat: "", road: "", po: "", area: "", pincode: "", district: "", state: "", country: "India", centerId: "" });
-    setMobileSearch("");
+    if (!isDonor) {
+      setSelectedDonorId("");
+      setDonorForm({ name: "", spiritualName: "", indianPassport: false, pan: "", tallyName: "", mobile: "", whatsapp: "", email: "", flat: "", road: "", po: "", area: "", pincode: "", district: "", state: "", country: "India", centerId: "" });
+      setMobileSearch("");
+    }
     setRemarks("");
     setUpiRef("");
     setChequeBankId("");
@@ -313,6 +324,20 @@ export default function BookingsPage() {
     <div className="grid lg:grid-cols-3 gap-6">
       {/* ==================== COLUMN 1: Search & Donor Info ==================== */}
       <div className="lg:col-span-1 space-y-4">
+        {isDonor ? (
+          /* Donor self-booking: read-only identity card */
+          <div className="bg-white rounded-xl card-shadow p-6">
+            <h3 className="font-display text-lg font-semibold text-theme-primary mb-4">Booking For</h3>
+            <div className="space-y-2 text-sm">
+              <p className="font-semibold text-theme-primary text-base">{donorForm.name || user?.username}</p>
+              {donorForm.spiritualName && <p className="text-theme-secondary">{donorForm.spiritualName}</p>}
+              <p className="text-theme-secondary">{donorForm.mobile}</p>
+              {donorForm.email && <p className="text-theme-secondary">{donorForm.email}</p>}
+              <p className="text-xs text-theme-muted pt-2">To update your details, use the My Profile tab.</p>
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Donor Search */}
         <div className="bg-white rounded-xl card-shadow p-6">
           <h3 className="font-display text-lg font-semibold text-theme-primary mb-4">Search Donor</h3>
@@ -400,6 +425,8 @@ export default function BookingsPage() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* ==================== COLUMN 2: Seva Selection ==================== */}

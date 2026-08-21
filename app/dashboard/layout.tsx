@@ -80,9 +80,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (item.donorOnly && !user.isDonor) return false;
     if (item.donorOnly) return true;
 
-    // Non-donor items: hide from donors (except dashboard, reports, notice, events)
+    // Non-donor items: hide from donors (except dashboard, seva, reports, notice, events)
     if (user.isDonor) {
-      const donorAllowed = ["/dashboard", "/dashboard/reports", "/dashboard/notice", "/dashboard/events", "/dashboard/profile"];
+      const donorAllowed = ["/dashboard", "/dashboard/bookings", "/dashboard/reports", "/dashboard/notice", "/dashboard/events", "/dashboard/profile"];
       return donorAllowed.includes(item.href);
     }
 
