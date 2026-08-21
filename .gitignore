@@ -50,3 +50,5 @@ ten_be_voucher_map.js
 scripts/__pycache__/
 scripts/*.py
 scripts/requirements-import.txt
+.vercel
+.env*

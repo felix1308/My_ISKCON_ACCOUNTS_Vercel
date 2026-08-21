@@ -26,6 +26,8 @@ import type { ApiResult, Permissions } from "../types";
 const now = () => new Date().toISOString();
 const bool = (v: unknown) => v === true || v === "true";
 const str = (v: unknown, dflt = "") => (v == null ? dflt : String(v).trim());
+/** Convert "all_centers" to "" so FK constraints on center_id (→ centers.id) don't break. */
+const fkCenter = (v: string) => (v === "all_centers" ? "" : v);
 const num = (v: unknown, dflt = 0) => {
   const n = typeof v === "number" ? v : parseFloat(String(v ?? ""));
   return Number.isFinite(n) ? n : dflt;
@@ -116,7 +118,7 @@ export async function handleCreate(params: {
     case "donor": {
       if (!record.name || !record.mobile)
         return { isOk: false, error: "Name and mobile are required" };
-      const centerId = str(record.centerId) || principal.centerId || "";
+      const centerId = fkCenter(str(record.centerId) || principal.centerId || "");
       await sql`
         INSERT INTO donors
           (id, name, spiritual_name, indian_passport, pan, mobile, whatsapp, email,
@@ -143,7 +145,7 @@ export async function handleCreate(params: {
 
     case "booking": {
       if (!record.donorId) return { isOk: false, error: "Donor ID is required" };
-      const centerId = str(record.centerId) || principal.centerId || "";
+      const centerId = fkCenter(str(record.centerId) || principal.centerId || "");
       const festivalQR = bool(record.festivalQR);
       const items = record.items ?? [];
       const paymentStatus = str(record.paymentStatus, "pending");
@@ -158,7 +160,7 @@ export async function handleCreate(params: {
            ${num(record.totalAmount)}, ${paymentStatus}, ${str(record.paymentMode, "online")},
            ${str(record.bookingDate, ts)}, ${centerId || null},
            ${str(record.collectedBy, principal.username)},
-           ${str(record.collectedByCenter, principal.centerId)},
+           ${fkCenter(str(record.collectedByCenter, principal.centerId))},
            ${str(record.chequeBankAccountId)}, ${festivalQR},
            ${str(record.razorpayOrderId)}, ${str(record.razorpayPaymentId)},
            ${str(record.paidAt)}, ${str(record.remarks)}, ${ts}, ${ts})
@@ -177,9 +179,11 @@ export async function handleCreate(params: {
 
     case "seva": {
       const sevaId = str(record.id) || generateSevaId();
-      const centerId = isSuperuserRole(principal.role)
-        ? (str(record.centerId) || "all_centers")
-        : (principal.centerId || "");
+      const centerId = fkCenter(
+        isSuperuserRole(principal.role)
+          ? (str(record.centerId) || "all_centers")
+          : (principal.centerId || "")
+      );
       await sql`
         INSERT INTO sevas
           (id, name, description, amount, center_id, is_active, darshan_qr, seva_qr,
@@ -255,8 +259,11 @@ export async function handleCreate(params: {
     case "bank_account":
     case "bankAccount": {
       const bankId = str(record.id) || `bank_${Date.now()}`;
-      const centerId = isSuperuserRole(principal.role)
-        ? (str(record.centerId) || "all_centers") : (str(record.centerId) || principal.centerId);
+      const centerId = fkCenter(
+        isSuperuserRole(principal.role)
+          ? (str(record.centerId) || "all_centers")
+          : (str(record.centerId) || principal.centerId)
+      );
       await sql`
         INSERT INTO bank_accounts (id, name, account_number, bank_name, center_id,
                                    payment_gateway_id, is_active, created_at, updated_at)
@@ -402,9 +409,9 @@ export async function handleUpdate(params: {
           payment_status = COALESCE(${str(record.paymentStatus) || null}, payment_status),
           payment_mode = COALESCE(${str(record.paymentMode) || null}, payment_mode),
           booking_date = COALESCE(${str(record.bookingDate) || null}, booking_date),
-          center_id = COALESCE(${str(record.centerId) || null}, center_id),
+          center_id = COALESCE(${fkCenter(str(record.centerId)) || null}, center_id),
           collected_by = COALESCE(${str(record.collectedBy) || null}, collected_by),
-          collected_by_center = COALESCE(${str(record.collectedByCenter) || null}, collected_by_center),
+          collected_by_center = COALESCE(${fkCenter(str(record.collectedByCenter)) || null}, collected_by_center),
           cheque_bank_account_id = COALESCE(${str(record.chequeBankAccountId) || null}, cheque_bank_account_id),
           festival_qr = COALESCE(${record.festivalQR == null ? null : bool(record.festivalQR)}, festival_qr),
           razorpay_order_id = COALESCE(${str(record.razorpayOrderId) || null}, razorpay_order_id),
@@ -424,7 +431,7 @@ export async function handleUpdate(params: {
           name = COALESCE(${str(record.name) || null}, name),
           description = COALESCE(${str(record.description) || null}, description),
           amount = COALESCE(${record.amount == null ? null : num(record.amount)}, amount),
-          center_id = COALESCE(${str(record.centerId) || null}, center_id),
+          center_id = COALESCE(${record.centerId != null ? (fkCenter(str(record.centerId)) || null) : null}, center_id),
           is_active = COALESCE(${record.isActive == null ? null : bool(record.isActive)}, is_active),
           darshan_qr = COALESCE(${str(record.darshanQR) || null}, darshan_qr),
           seva_qr = COALESCE(${str(record.sevaQR) || null}, seva_qr),

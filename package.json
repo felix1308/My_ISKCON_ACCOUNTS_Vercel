@@ -9,15 +9,18 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "migrate": "tsx scripts/migrate-from-json.ts",
-    "db:push": "tsx scripts/db-push.ts"
+    "migrate": "node --env-file=.env.local node_modules/.bin/tsx scripts/migrate-from-json.ts",
+    "db:push": "node --env-file=.env.local node_modules/.bin/tsx scripts/db-push.ts",
+    "fix-dates": "node --env-file=.env.local node_modules/.bin/tsx scripts/fix-bad-dates.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "bcryptjs": "3.0.3",
+    "chart.js": "^4.5.1",
     "next": "16.3.0",
     "razorpay": "2.9.8",
     "react": "19.2.8",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.8",
     "zod": "4.4.3"
   },

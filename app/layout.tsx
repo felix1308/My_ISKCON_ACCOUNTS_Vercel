@@ -14,7 +14,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className="h-full">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+        <script src="https://checkout.razorpay.com/v1/checkout.js" async />
+      </head>
+      <body className="h-full bg-theme-page">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

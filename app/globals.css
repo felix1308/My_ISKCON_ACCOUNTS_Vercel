@@ -1,22 +1,170 @@
 @import "tailwindcss";
 
-/* MyISKCON Accounts global styles */
-
+/* ==================== CANVA THEME: #FFFFFF, #FF66C4, #FF914D ==================== */
 :root {
-  --background: 250 250 249;
-  --foreground: 24 24 27;
+  --theme-white: #FFFFFF;
+  --theme-pink: #FF66C4;
+  --theme-orange: #FF914D;
+  --theme-gradient: radial-gradient(circle at 0% 0%, #FFFFFF 0%, #FF66C4 40%, #FF914D 100%);
+  --theme-gradient-linear: linear-gradient(135deg, #FFFFFF 0%, #FF66C4 50%, #FF914D 100%);
+  --theme-page-bg: #FFF5FC;
+  --theme-muted: #FFE5F5;
+  --theme-border: #FFC2E8;
+  --theme-border-strong: #FF66C4;
+  --theme-accent: #FF66C4;
+  --theme-accent-hover: #FF4DB8;
+  --theme-secondary: #FF914D;
+  --theme-secondary-hover: #FF7A33;
+  --theme-text-primary: #2D1B28;
+  --theme-text-secondary: #5C3A47;
+  --theme-text-muted: #8B5A6B;
+  --theme-shadow: rgba(255, 102, 196, 0.18);
+  --theme-shadow-hover: rgba(255, 102, 196, 0.28);
 }
 
-html,
-body {
+html, body {
   height: 100%;
 }
 
 body {
-  background-color: rgb(var(--background));
-  color: rgb(var(--foreground));
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  box-sizing: border-box;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--theme-text-primary);
+  background-color: var(--theme-page-bg);
+}
+
+.font-display {
+  font-family: 'Crimson Pro', Georgia, serif;
+}
+
+.gradient-bg {
+  background: var(--theme-gradient-linear);
+}
+
+.card-shadow {
+  box-shadow: 0 4px 20px var(--theme-shadow);
+}
+
+.card-shadow-hover:hover {
+  box-shadow: 0 8px 25px var(--theme-shadow-hover);
+}
+
+/* Primary button — pink→orange gradient */
+.btn-primary {
+  background: linear-gradient(135deg, var(--theme-pink) 0%, var(--theme-orange) 100%);
+  color: var(--theme-white) !important;
+  transition: all 0.3s ease;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--theme-accent-hover) 0%, var(--theme-secondary-hover) 100%);
+  transform: translateY(-1px);
+  color: var(--theme-white) !important;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  transform: none;
+}
+
+/* Sidebar active tab — left pink border + page bg */
+.tab-active {
+  border-left: 4px solid var(--theme-pink);
+  background-color: var(--theme-page-bg);
+  color: var(--theme-text-primary) !important;
+}
+
+.sidebar-nav .tab-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-radius: 0;
+  border-left: 4px solid transparent;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.sidebar-nav .tab-btn:hover {
+  background-color: var(--theme-page-bg);
+}
+
+/* Seva card hover */
+.seva-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px var(--theme-shadow-hover);
+}
+
+/* Toast animations */
+.toast {
+  animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+}
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* Permission cards */
+.permission-card {
+  border: 2px solid var(--theme-border-strong);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--theme-muted);
+  transition: all 0.2s ease;
+}
+.permission-card:hover {
+  border-color: var(--theme-pink);
+  box-shadow: 0 4px 12px var(--theme-shadow);
+}
+
+/* Focus styles */
+.theme-focus:focus {
+  outline: none;
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 2px var(--theme-shadow);
+}
+
+/* Checkbox accent */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--theme-pink);
+}
+
+/* ==================== Theme utility classes ==================== */
+.bg-theme-page { background-color: var(--theme-page-bg); }
+.bg-theme-muted { background-color: var(--theme-muted); }
+.bg-theme-card { background-color: var(--theme-white); }
+.bg-theme-accent { background-color: var(--theme-accent); }
+.bg-theme-pink { background-color: var(--theme-pink); }
+.bg-theme-orange { background-color: var(--theme-orange); }
+.text-theme-primary { color: var(--theme-text-primary); }
+.text-theme-secondary { color: var(--theme-text-secondary); }
+.text-theme-muted { color: var(--theme-text-muted); }
+.text-theme-accent { color: var(--theme-accent); }
+.text-theme-white { color: var(--theme-white); }
+.border-theme { border-color: var(--theme-border); }
+.border-theme-strong { border-color: var(--theme-border-strong); }
+.border-theme-pink { border-color: var(--theme-pink); }
+.hover\:bg-theme-page:hover { background-color: var(--theme-page-bg); }
+.hover\:bg-theme-muted:hover { background-color: var(--theme-muted); }
+.hover\:text-theme-primary:hover { color: var(--theme-text-primary); }
+.hover\:text-theme-secondary:hover { color: var(--theme-text-secondary); }
+.hover\:border-theme:hover { border-color: var(--theme-border); }
+
+/* Loading overlay */
+@keyframes iskcon-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%       { transform: scale(1.1); opacity: 0.6; }
+}
+.loading-logo {
+  width: 120px; height: 120px;
+  animation: iskcon-pulse 1.6s ease-in-out infinite;
 }
 
 /* Print: hide everything except the receipt being printed */

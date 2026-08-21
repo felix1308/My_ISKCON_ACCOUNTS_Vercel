@@ -29,6 +29,10 @@ const IMPORT_BRANCH_MAP: Record<string, string> = {
 function normalizeMobile(m: unknown): string {
   return String(m ?? "").replace(/\D/g, "").slice(-10);
 }
+/** Returns true only for YYYY-MM-DD strings that parse to a real calendar date. */
+function isValidDate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
+}
 function derivePaymentMode(txnType: unknown): string {
   const t = String(txnType ?? "").toLowerCase();
   if (t.includes("razorpay") || t.includes("online")) return "online";
@@ -210,7 +214,8 @@ export async function bulkImportTransactions(params: {
     const paymentMode = derivePaymentMode(txn.transactionType);
     const sevaName = String(txn.tallyLedger ?? "Donation").trim();
     const amount = Number(parseFloat(String(txn.amount ?? 0)) || 0);
-    const bookingDate = String(txn.date ?? ts.split("T")[0]).trim();
+    const rawDate = String(txn.date ?? "").trim();
+    const bookingDate = isValidDate(rawDate) ? rawDate : ts.split("T")[0];
     const txnDetails = String(txn.transactionDetails ?? "").trim();
     const razorpayPaymentId = txnDetails.startsWith("pay_") ? txnDetails : "";
     const tenBeUrl = String(txn.tenBeUrl ?? "").trim();

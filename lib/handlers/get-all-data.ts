@@ -142,8 +142,9 @@ export async function handleGetAllData(params: {
   for (const b of bookingRows) {
     if (principal.role === "donor") {
       if (b.donor_id !== principal.donorId) continue;
-    } else if (!allowedSet.has(String(b.center_id ?? "").trim())) {
-      continue;
+    } else if (!isSuperuserRole(principal.role)) {
+      const bCenter = String(b.center_id ?? "").trim();
+      if (bCenter && !allowedSet.has(bCenter)) continue;
     }
     out.push({
       type: "booking",
@@ -178,8 +179,9 @@ export async function handleGetAllData(params: {
   for (const t of txnRows) {
     if (principal.role === "donor") {
       if (t.donor_id !== principal.donorId) continue;
-    } else if (String(t.center_id ?? "").trim() && !allowedSet.has(String(t.center_id).trim())) {
-      continue;
+    } else if (!isSuperuserRole(principal.role)) {
+      const tCenter = String(t.center_id ?? "").trim();
+      if (tCenter && !allowedSet.has(tCenter)) continue;
     }
     const camel = toCamelRow<Record<string, unknown>>(t);
     out.push({ type: "transaction", ...camel });

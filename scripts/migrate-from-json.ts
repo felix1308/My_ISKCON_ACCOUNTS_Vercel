@@ -82,6 +82,10 @@ const IMPORT_BRANCH_MAP: Record<string, string> = {
 function normalizeMobile(m: unknown): string {
   return String(m ?? "").replace(/\D/g, "").slice(-10);
 }
+/** Returns true only for YYYY-MM-DD strings that parse to a real calendar date. */
+function isValidDate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
+}
 function derivePaymentMode(t: unknown): string {
   const s = String(t ?? "").toLowerCase();
   if (s.includes("razorpay") || s.includes("online")) return "online";
@@ -89,6 +93,25 @@ function derivePaymentMode(t: unknown): string {
   if (s.includes("upi")) return "upi";
   if (s.includes("card")) return "card";
   return "cash";
+}
+
+// Retry wrapper — Neon HTTP connections can drop under load. Retry with backoff.
+async function withRetry<T>(fn: () => Promise<T>, retries = 5, baseDelay = 1000): Promise<T> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (attempt < retries - 1 && (/fetch failed|connect timeout|ECONNRESET|socket hang up|ETIMEDOUT/i.test(msg))) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.error(`  [retry ${attempt + 1}/${retries}] ${msg.split("\n")[0]} — waiting ${delay}ms`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error("unreachable");
 }
 
 async function main() {
@@ -99,7 +122,7 @@ async function main() {
   console.log(`Loaded ${data.donors.length} donors from ${JSON_PATH}`);
 
   // Build dedup maps of existing donors by mobile and PAN.
-  const existing = await sqlTyped<{ id: string; mobile: string; pan: string }>`SELECT id, mobile, pan FROM donors`;
+  const existing = await withRetry(() => sqlTyped<{ id: string; mobile: string; pan: string }>`SELECT id, mobile, pan FROM donors`);
   const mobileMap = new Map<string, string>();
   const panMap = new Map<string, string>();
   for (const d of existing) {
@@ -111,7 +134,7 @@ async function main() {
   }
 
   // Existing booking dedup keys (voucherNo|donorId from remarks).
-  const existingBookings = await sqlTyped<{ remarks: string; donor_id: string }>`SELECT remarks, donor_id FROM bookings WHERE remarks LIKE 'voucherNo:%'`;
+  const existingBookings = await withRetry(() => sqlTyped<{ remarks: string; donor_id: string }>`SELECT remarks, donor_id FROM bookings WHERE remarks LIKE 'voucherNo:%'`);
   const voucherKeys = new Set<string>();
   for (const b of existingBookings) {
     const m = String(b.remarks).match(/^voucherNo:([^\s|]+)/);
@@ -134,7 +157,7 @@ async function main() {
     } else {
       donorId = generateId("donor");
       const centerId = (d.centerId ?? "").trim() || "center_bangalore";
-      await write`
+      await withRetry(() => write`
         INSERT INTO donors
           (id, name, spiritual_name, indian_passport, pan, mobile, whatsapp, email,
            flat, road, po, area, pincode, district, state, country, tally_name,
@@ -150,8 +173,8 @@ async function main() {
            ${(d.pincode ?? "").trim()}, ${(d.district ?? "").trim()},
            ${(d.state ?? "").trim()}, ${(d.country ?? "India").trim()},
            ${(d.tallyName ?? "").trim()}, ${centerId || null},
-           "", 'bcrypt', 'migration', ${ts}, ${ts})
-      `;
+           '', 'bcrypt', 'migration', ${ts}, ${ts})
+      `);
       if (mob) mobileMap.set(mob, donorId);
       if (pan) panMap.set(pan, donorId);
       donorsCreated++;
@@ -169,7 +192,8 @@ async function main() {
       const branchRaw = (t.branch ?? "").trim().toUpperCase().split(/[\s\-_\/|,]+/)[0];
       const centerId = IMPORT_BRANCH_MAP[branchRaw] || (d.centerId ?? "").trim() || "center_bangalore";
       const amount = Number(t.amount ?? 0) || 0;
-      const bookingDate = (t.date ?? ts.split("T")[0]).trim();
+      const rawDate = (t.date ?? "").trim();
+      const bookingDate = isValidDate(rawDate) ? rawDate : ts.split("T")[0];
       const txnDetails = (t.transactionDetails ?? "").trim();
       const razorpayPaymentId = txnDetails.startsWith("pay_") ? txnDetails : "";
       const remarks = `voucherNo:${voucherNo}${t.bank ? ` | bank:${t.bank}` : ""}`;
@@ -177,7 +201,7 @@ async function main() {
       // transactions row
       const txnId = generateId("txn");
       try {
-        await write`
+        await withRetry(() => write`
           INSERT INTO transactions
             (id, donor_id, voucher_no, txn_date, amount, transaction_details,
              bank, transaction_type, tally_ledger, status_80g, branch, center_id, created_at)
@@ -186,7 +210,7 @@ async function main() {
              ${txnDetails}, ${(t.bank ?? "").trim()}, ${(t.transactionType ?? "").trim()},
              ${(t.tallyLedger ?? "").trim()}, ${(t.status80g ?? "").trim()},
              ${(t.branch ?? "").trim()}, ${centerId || null}, ${ts})
-        `;
+        `);
         txnsCreated++;
       } catch (e) {
         txnsSkipped++;
@@ -197,7 +221,7 @@ async function main() {
       const bookingId = generateId("bk");
       const items = [{ sevaId: "imported", name: (t.tallyLedger ?? "Donation").trim(), description: (t.status80g ?? "").trim(), amount, quantity: 1, bookingDate }];
       try {
-        await write`
+        await withRetry(() => write`
           INSERT INTO bookings
             (id, donor_id, items, total_amount, payment_status, payment_mode, booking_date,
              center_id, collected_by, collected_by_center, cheque_bank_account_id, festival_qr,
@@ -207,7 +231,7 @@ async function main() {
              ${derivePaymentMode(t.transactionType)}, ${bookingDate}, ${centerId || null},
              'migration', ${centerId}, '', FALSE, '', ${razorpayPaymentId},
              ${bookingDate + "T00:00:00.000Z"}, ${remarks}, ${ts}, ${ts})
-        `;
+        `);
         bookingsCreated++;
       } catch (e) {
         bookingsSkipped++;
@@ -215,8 +239,8 @@ async function main() {
       }
     }
 
-    if ((i + 1) % 500 === 0) {
-      console.log(`  ...processed ${i + 1}/${data.donors.length} donors`);
+    if ((i + 1) % 100 === 0) {
+      console.log(`  ...processed ${i + 1}/${data.donors.length} donors (${donorsCreated} new, ${donorsSkipped} skipped)`);
     }
   }
 

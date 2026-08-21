@@ -21,49 +21,49 @@ export default function UsersPage() {
     else alert((result as { error?: string }).error);
   }
 
-  if (loading) return <div className="text-center py-12 text-gray-400">Loading users...</div>;
+  if (loading) return <div className="text-center py-12 text-theme-muted">Loading users...</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Users ({users.length})</h1>
-        {isSuperuser && <button onClick={() => setShowForm(true)} className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium px-4 py-2 rounded-lg">+ Add User</button>}
+        <h1 className="font-display text-2xl font-bold text-theme-primary">Manage Users ({users.length})</h1>
+        {isSuperuser && <button onClick={() => setShowForm(true)} className="btn-primary text-sm font-medium px-4 py-2 rounded-lg">+ Add User</button>}
       </div>
 
       {showForm && (
-        <div className="bg-white border rounded-xl p-5 space-y-3">
-          <h2 className="font-semibold">New User</h2>
+        <div className="bg-white rounded-xl card-shadow border border-theme p-5 space-y-3">
+          <h2 className="font-display font-semibold text-theme-primary">New User</h2>
           <div className="grid grid-cols-2 gap-3">
-            <input className="px-3 py-2 border rounded-lg text-sm" placeholder="Username *" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-            <input type="password" className="px-3 py-2 border rounded-lg text-sm" placeholder="Password *" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-            <select className="px-3 py-2 border rounded-lg text-sm" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <input className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" placeholder="Username *" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+            <input type="password" className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" placeholder="Password *" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <select className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
               <option value="volunteer">Volunteer</option>
               <option value="admin">Admin</option>
             </select>
-            <select className="px-3 py-2 border rounded-lg text-sm" value={form.centerId} onChange={(e) => setForm({ ...form, centerId: e.target.value })}>
+            <select className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" value={form.centerId} onChange={(e) => setForm({ ...form, centerId: e.target.value })}>
               <option value="">Select center</option>
               {centers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} className="bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-2 rounded-lg">Save</button>
-            <button onClick={() => setShowForm(false)} className="text-sm px-4 py-2 border rounded-lg">Cancel</button>
+            <button onClick={handleSave} className="btn-primary text-sm px-4 py-2 rounded-lg">Save</button>
+            <button onClick={() => setShowForm(false)} className="text-sm px-4 py-2 border border-theme rounded-lg text-theme-secondary hover:text-theme-primary">Cancel</button>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl card-shadow overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500">
-            <tr><th className="px-4 py-2 text-left font-medium">Username</th><th className="px-4 py-2 text-left font-medium">Role</th><th className="px-4 py-2 text-left font-medium">Center</th><th className="px-4 py-2 text-left font-medium">Created By</th></tr>
+          <thead className="bg-theme-muted text-theme-secondary">
+            <tr><th className="px-4 py-3 text-left font-medium">Username</th><th className="px-4 py-3 text-left font-medium">Role</th><th className="px-4 py-3 text-left font-medium">Center</th><th className="px-4 py-3 text-left font-medium">Created By</th></tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-theme-muted">
             {users.map((u) => (
-              <tr key={u.__backendId} className="hover:bg-gray-50">
-                <td className="px-4 py-2.5 font-medium">{u.username}</td>
-                <td className="px-4 py-2.5"><span className="capitalize px-2 py-0.5 rounded-full text-xs bg-gray-100">{u.role}</span></td>
-                <td className="px-4 py-2.5 text-gray-600">{centers.find((c) => c.id === u.centerId)?.name || u.centerId || "—"}</td>
-                <td className="px-4 py-2.5 text-gray-500">{u.createdBy || "—"}</td>
+              <tr key={u.__backendId} className="hover:bg-theme-page transition">
+                <td className="px-4 py-2.5 font-medium text-theme-primary">{u.username}</td>
+                <td className="px-4 py-2.5"><span className="capitalize px-2 py-0.5 rounded-full text-xs bg-theme-muted text-theme-secondary">{u.role}</span></td>
+                <td className="px-4 py-2.5 text-theme-secondary">{centers.find((c) => c.id === u.centerId)?.name || u.centerId || "—"}</td>
+                <td className="px-4 py-2.5 text-theme-secondary">{u.createdBy || "—"}</td>
               </tr>
             ))}
           </tbody>

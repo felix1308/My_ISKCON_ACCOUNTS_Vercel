@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useAllData, byType } from "@/lib/use-all-data";
 import { useAuth } from "@/lib/auth-context";
 import { callApi } from "@/lib/client";
@@ -40,50 +40,50 @@ export default function SevasPage() {
     reload();
   }
 
-  if (loading) return <div className="text-center py-12 text-gray-400">Loading sevas...</div>;
+  if (loading) return <div className="text-center py-12 text-theme-muted">Loading sevas...</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Sevas ({sevas.length})</h1>
-        {canManage && <button onClick={startNew} className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium px-4 py-2 rounded-lg">+ Add Seva</button>}
+        <h1 className="font-display text-2xl font-bold text-theme-primary">Manage Sevas / Donations ({sevas.length})</h1>
+        {canManage && <button onClick={startNew} className="btn-primary text-sm font-medium px-4 py-2 rounded-lg">+ Add Seva</button>}
       </div>
 
       {showForm && (
-        <div className="bg-white border rounded-xl p-5 space-y-3">
-          <h2 className="font-semibold">{editing ? "Edit Seva" : "New Seva"}</h2>
+        <div className="bg-white rounded-xl card-shadow border border-theme p-5 space-y-3">
+          <h2 className="font-display font-semibold text-theme-primary">{editing ? "Edit Seva" : "New Seva"}</h2>
           <div className="grid grid-cols-2 gap-3">
-            <input className="px-3 py-2 border rounded-lg text-sm" placeholder="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <input type="number" className="px-3 py-2 border rounded-lg text-sm" placeholder="Amount (₹)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-            <input className="px-3 py-2 border rounded-lg text-sm col-span-2" placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-            {(isSuperuser) && (
-              <select className="px-3 py-2 border rounded-lg text-sm" value={form.centerId} onChange={(e) => setForm({ ...form, centerId: e.target.value })}>
+            <input className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" placeholder="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input type="number" className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" placeholder="Amount (₹)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            <input className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm col-span-2" placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            {isSuperuser && (
+              <select className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" value={form.centerId} onChange={(e) => setForm({ ...form, centerId: e.target.value })}>
                 <option value="">All centers</option>
                 {centers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} className="bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-2 rounded-lg">Save</button>
-            <button onClick={() => setShowForm(false)} className="text-sm px-4 py-2 border rounded-lg">Cancel</button>
+            <button onClick={handleSave} className="btn-primary text-sm px-4 py-2 rounded-lg">Save</button>
+            <button onClick={() => setShowForm(false)} className="text-sm px-4 py-2 border border-theme rounded-lg text-theme-secondary hover:text-theme-primary">Cancel</button>
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {sevas.map((s) => (
-          <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4">
+          <div key={s.id} className="seva-card bg-white rounded-xl card-shadow border border-theme p-5 transition">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-semibold text-gray-800">{s.name}</h3>
-                {s.description && <p className="text-xs text-gray-500 mt-1">{s.description}</p>}
+                <h3 className="font-display font-semibold text-theme-primary">{s.name}</h3>
+                {s.description && <p className="text-xs text-theme-muted mt-1">{s.description}</p>}
               </div>
-              <div className="text-lg font-bold text-orange-600">₹{s.amount}</div>
+              <div className="text-lg font-bold text-theme-accent">₹{s.amount}</div>
             </div>
-            <div className="text-xs text-gray-400 mt-2">{s.centerId === "all_centers" || !s.centerId ? "All centers" : centers.find((c) => c.id === s.centerId)?.name || s.centerId}</div>
+            <div className="text-xs text-theme-muted mt-2">{s.centerId === "all_centers" || !s.centerId ? "All centers" : centers.find((c) => c.id === s.centerId)?.name || s.centerId}</div>
             {canManage && (
               <div className="flex gap-2 mt-3">
-                <button onClick={() => startEdit(s)} className="text-xs text-blue-600 hover:underline">Edit</button>
+                <button onClick={() => startEdit(s)} className="text-xs text-theme-accent hover:underline">Edit</button>
                 <button onClick={() => handleDelete(s.id)} className="text-xs text-red-600 hover:underline">Delete</button>
               </div>
             )}

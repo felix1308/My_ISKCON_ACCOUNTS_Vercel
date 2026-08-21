@@ -72,9 +72,11 @@ export async function sqlTyped<T = Record<string, unknown>>(
  * script to execute statements parsed from schema.sql. NEVER pass user input.
  */
 export async function sqlRaw(query: string): Promise<unknown[]> {
-  // Neon's tagged template expects TemplateStringsArray; we emulate a single-
-  // string template with no interpolations.
-  return sql({ raw: [query], cooked: [query] } as unknown as TemplateStringsArray);
+  // Neon's tagged template only accepts real tagged-template calls; for raw
+  // strings we use the .query() method with no parameters.
+  const sqlFn = getSql();
+  return (sqlFn as unknown as { query: (text: string, params?: unknown[]) => Promise<unknown[]> })
+    .query(query, []);
 }
 
 /**

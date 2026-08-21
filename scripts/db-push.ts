@@ -13,33 +13,48 @@ import { fileURLToPath } from "node:url";
 import { directSql } from "../lib/db-direct";
 import { getEnv } from "../lib/env";
 
-// directSql returns the Neon tagged-template function; we wrap a raw string
-// as a single-statement template with no interpolations to run DDL parsed
-// from schema.sql. NEVER pass user input through this path.
+// directSql returns the Neon tagged-template function, which also exposes
+// a .query() method for conventional SQL strings with $1/$2 placeholders.
+// We use it here with no params to run DDL parsed from schema.sql.
+// NEVER pass user input through this path.
 async function runRaw(sqlFn: ReturnType<typeof directSql>, stmt: string): Promise<void> {
-  await sqlFn({ raw: [stmt], cooked: [stmt] } as unknown as TemplateStringsArray);
+  await (sqlFn as unknown as { query: (text: string, params?: unknown[]) => Promise<unknown[]> })
+    .query(stmt, []);
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = join(__dirname, "..", "db", "schema.sql");
 
 function splitStatements(sqlText: string): string[] {
+  // Strip -- single-line comments first, then split on semicolons.
+  // This avoids semicolons inside comments breaking the splitter, and
+  // prevents comment-prefixed statements from being skipped.
+  const lines = sqlText.split("\n");
+  const cleaned: string[] = [];
+  let inDollar = false;
+  for (const line of lines) {
+    // Track $$ ... $$ blocks — don't strip comments inside function bodies.
+    if (line.includes("$$")) inDollar = !inDollar;
+    if (!inDollar && line.trimStart().startsWith("--")) continue;
+    cleaned.push(line);
+  }
+  const text = cleaned.join("\n");
+
   const stmts: string[] = [];
   let buf = "";
-  let inDollar = false;
-  for (let i = 0; i < sqlText.length; i++) {
-    const ch = sqlText[i];
+  let inDollar2 = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
     buf += ch;
-    // Track $$ ... $$ blocks (function bodies / DO blocks).
-    if (ch === "$" && sqlText[i + 1] === "$") {
-      inDollar = !inDollar;
+    if (ch === "$" && text[i + 1] === "$") {
+      inDollar2 = !inDollar2;
       buf += "$";
       i++;
       continue;
     }
-    if (ch === ";" && !inDollar) {
+    if (ch === ";" && !inDollar2) {
       const trimmed = buf.trim();
-      if (trimmed && !trimmed.startsWith("--")) stmts.push(trimmed);
+      if (trimmed) stmts.push(trimmed);
       buf = "";
     }
   }
