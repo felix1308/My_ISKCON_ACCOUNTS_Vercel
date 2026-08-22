@@ -326,7 +326,6 @@ export default function BookingsPage() {
         },
       };
 
-      cleanupRazorpayModals(); // stale modal keeps the previous order's UPI QR
       const rzp = new RazorpayClass(rzpOptions);
       rzp.open();
     } catch (e) {

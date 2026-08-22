@@ -249,7 +249,6 @@ export default function EventsPage() {
       },
     };
 
-    cleanupRazorpayModals(); // stale modal keeps the previous order's UPI QR
     const rzp = new RazorpayClass(rzpOptions);
     rzp.open();
   }

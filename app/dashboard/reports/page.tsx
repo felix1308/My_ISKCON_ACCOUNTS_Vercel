@@ -248,7 +248,6 @@ export default function ReportsPage() {
       const paymentGatewayId = (order.paymentGatewayId as string) || "";
       const donor = findDonor(b.donorId);
 
-      cleanupRazorpayModals(); // stale modal keeps the previous order's UPI QR
       const rzp = new RazorpayClass({
         key: order.keyId,
         amount: order.amount,
