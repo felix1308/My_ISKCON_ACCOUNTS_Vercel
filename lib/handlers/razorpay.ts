@@ -49,6 +49,61 @@ async function getGatewayIdForCenter(centerId: string): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
+// RESOLVE GATEWAY (read-only — which account would charge for this center)
+// ---------------------------------------------------------------------------
+
+interface ResolvedGateway {
+  keyId: string;
+  keySecret: string;
+  gatewayId: string | null;
+  gatewayName: string;
+  source: "explicit" | "center" | "fallback";
+}
+
+async function resolveGateway(
+  paymentGatewayId?: string,
+  centerId?: string
+): Promise<ResolvedGateway | null> {
+  const env = getEnv();
+  if (paymentGatewayId?.trim()) {
+    const creds = await getPaymentGatewayCredentials(paymentGatewayId);
+    if (creds) {
+      const row = await sqlOne<{ name: string }>`SELECT name FROM payment_gateways WHERE id = ${paymentGatewayId} LIMIT 1`;
+      return { ...creds, gatewayId: paymentGatewayId, gatewayName: row?.name ?? "Selected gateway", source: "explicit" };
+    }
+  }
+  if (centerId?.trim()) {
+    const gid = await getGatewayIdForCenter(centerId);
+    if (gid) {
+      const creds = await getPaymentGatewayCredentials(gid);
+      if (creds) {
+        const row = await sqlOne<{ name: string }>`SELECT name FROM payment_gateways WHERE id = ${gid} LIMIT 1`;
+        return { ...creds, gatewayId: gid, gatewayName: row?.name ?? "Center gateway", source: "center" };
+      }
+    }
+  }
+  if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) return null;
+  return { keyId: env.RAZORPAY_KEY_ID, keySecret: env.RAZORPAY_KEY_SECRET, gatewayId: null, gatewayName: "Default account (env)", source: "fallback" };
+}
+
+/**
+ * Read-only: returns which Razorpay account WOULD charge for the given center.
+ * Safe to expose — keyId is public (it appears in the checkout popup anyway);
+ * the secret is never returned.
+ */
+export async function resolvePaymentGateway(params: {
+  sessionId?: string;
+  centerId?: string;
+  paymentGatewayId?: string;
+}, req: Request): Promise<ApiResult> {
+  void req;
+  await resolvePrincipal(params.sessionId); // auth-only
+  const gw = await resolveGateway(params.paymentGatewayId, params.centerId);
+  if (!gw) return { isOk: false, error: "Razorpay is not configured" };
+  return { isOk: true, gatewayId: gw.gatewayId, gatewayName: gw.gatewayName, keyId: gw.keyId, source: gw.source };
+}
+
+// ---------------------------------------------------------------------------
 // CREATE ORDER
 // ---------------------------------------------------------------------------
 
@@ -61,30 +116,14 @@ export async function createRazorpayOrder(params: {
   paymentGatewayId?: string;
 }, req: Request): Promise<ApiResult> {
   await resolvePrincipal(params.sessionId); // auth-only
-  const env = getEnv();
 
   const amountPaise = Math.round(Number(params.amount ?? 0));
   if (amountPaise < 100) return { isOk: false, error: "Amount must be at least ₹1" };
 
-  let creds: GatewayCreds | null = null;
-  let usedGatewayId: string | null = null;
-  if (params.paymentGatewayId?.trim()) {
-    creds = await getPaymentGatewayCredentials(params.paymentGatewayId);
-    if (creds) usedGatewayId = params.paymentGatewayId!;
-  }
-  if (!creds && params.centerId?.trim()) {
-    const gid = await getGatewayIdForCenter(params.centerId);
-    if (gid) {
-      creds = await getPaymentGatewayCredentials(gid);
-      if (creds) usedGatewayId = gid;
-    }
-  }
-  if (!creds) {
-    if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) {
-      return { isOk: false, error: "Razorpay is not configured" };
-    }
-    creds = { keyId: env.RAZORPAY_KEY_ID, keySecret: env.RAZORPAY_KEY_SECRET };
-  }
+  const gw = await resolveGateway(params.paymentGatewayId, params.centerId);
+  if (!gw) return { isOk: false, error: "Razorpay is not configured" };
+  const creds: GatewayCreds = { keyId: gw.keyId, keySecret: gw.keySecret };
+  const usedGatewayId = gw.gatewayId;
 
   const rzp = new Razorpay({ key_id: creds.keyId, key_secret: creds.keySecret });
   const receipt = (params.receipt ?? `rcp_${Date.now()}`).toString().slice(0, 40);
@@ -101,6 +140,8 @@ export async function createRazorpayOrder(params: {
       keyId: creds.keyId,
       amount: order.amount,
       currency: order.currency ?? "INR",
+      gatewayName: gw.gatewayName,
+      gatewaySource: gw.source,
     };
     if (usedGatewayId) result.paymentGatewayId = usedGatewayId;
     return result;

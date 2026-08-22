@@ -55,6 +55,20 @@ export default function BookingsPage() {
   const [chequeBankId, setChequeBankId] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [gatewayInfo, setGatewayInfo] = useState<{ gatewayName: string; keyId: string; source: string } | null>(null);
+
+  // Show which Razorpay account will charge for the selected center.
+  useEffect(() => {
+    const cid = selectedCenterId || (isSuperuser ? "all_centers" : user?.centerId || "");
+    if (!cid) { setGatewayInfo(null); return; }
+    let cancelled = false;
+    callApi("resolvePaymentGateway", { centerId: cid }).then((r) => {
+      if (cancelled) return;
+      if (r.isOk) setGatewayInfo(r as unknown as { gatewayName: string; keyId: string; source: string });
+      else setGatewayInfo(null);
+    }).catch(() => { if (!cancelled) setGatewayInfo(null); });
+    return () => { cancelled = true; };
+  }, [selectedCenterId, isSuperuser, user?.centerId]);
 
   const today = new Date().toISOString().split("T")[0];
   const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN")}`;
@@ -584,6 +598,15 @@ export default function BookingsPage() {
               className="w-full px-3 py-2 text-sm border border-theme rounded-lg theme-focus outline-none resize-y"
               placeholder="E.g. In memory of..., for birthday, etc." />
           </div>
+
+          {/* Which Razorpay account will charge — for testing/verification */}
+          {paymentMode === "online" && gatewayInfo && (
+            <div className="text-xs text-theme-muted bg-theme-page border border-theme rounded-lg px-3 py-2 mb-3">
+              Payment account: <span className="font-semibold text-theme-secondary">{gatewayInfo.gatewayName}</span>
+              <span className="ml-1 font-mono">({gatewayInfo.keyId})</span>
+              {gatewayInfo.source === "fallback" && <span className="ml-1">— default, no center gateway linked</span>}
+            </div>
+          )}
 
           {saveError && <div className="text-sm text-red-600 bg-red-50 rounded p-2 mb-3">{saveError}</div>}
 

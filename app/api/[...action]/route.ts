@@ -33,7 +33,7 @@ import {
 import { handleGetAllData } from "@/lib/handlers/get-all-data";
 import { handleCreate, handleUpdate, handleDelete } from "@/lib/handlers/crud";
 import {
-  createRazorpayOrder, verifyRazorpayPayment,
+  createRazorpayOrder, verifyRazorpayPayment, resolvePaymentGateway,
 } from "@/lib/handlers/razorpay";
 import {
   sendWhatsAppMessage, sendBulkDonorLoginWhatsApp, sendDonorLoginWhatsApp,
@@ -94,6 +94,7 @@ const handlers: Record<string, Handler> = {
   // --- Razorpay ---
   createRazorpayOrder: (p, req) => createRazorpayOrder(p, req),
   verifyRazorpayPayment: (p, req) => verifyRazorpayPayment(p, req),
+  resolvePaymentGateway: (p, req) => resolvePaymentGateway(p, req),
 
   // --- WhatsApp ---
   sendWhatsAppMessage: (p) => sendWhatsAppMessage(p),
