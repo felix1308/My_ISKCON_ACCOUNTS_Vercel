@@ -460,9 +460,9 @@ export async function handleUpdate(params: {
           amount = COALESCE(${record.amount == null ? null : num(record.amount)}, amount),
           center_id = COALESCE(${record.centerId != null ? (fkCenter(str(record.centerId)) || null) : null}, center_id),
           is_active = COALESCE(${record.isActive == null ? null : bool(record.isActive)}, is_active),
-          darshan_qr = COALESCE(${str(record.darshanQR) || null}, darshan_qr),
-          seva_qr = COALESCE(${str(record.sevaQR) || null}, seva_qr),
-          prasadam_qr = COALESCE(${str(record.prasadamQR) || null}, prasadam_qr),
+          darshan_qr = COALESCE(${record.darshanQR != null ? str(record.darshanQR) : null}, darshan_qr),
+          seva_qr = COALESCE(${record.sevaQR != null ? str(record.sevaQR) : null}, seva_qr),
+          prasadam_qr = COALESCE(${record.prasadamQR != null ? str(record.prasadamQR) : null}, prasadam_qr),
           notify_whatsapp = COALESCE(${record.notifyWhatsapp == null ? null : bool(record.notifyWhatsapp)}, notify_whatsapp),
           notify_numbers = COALESCE(${
             record.notifyNumbers != null

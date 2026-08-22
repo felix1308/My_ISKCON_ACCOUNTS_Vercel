@@ -46,8 +46,11 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Centers", href: "/dashboard/centers", superadminOnly: true, emoji: "🏛️" },
   { label: "Temples", href: "/dashboard/temples", superadminOnly: true, emoji: "🏯" },
   { label: "Departments", href: "/dashboard/departments", superadminOnly: true, emoji: "🏢" },
-  { label: "Validate QR", href: "/dashboard/validate-qr", superadminOnly: true, emoji: "📱" },
+  { label: "Validate QR", href: "/dashboard/validate-qr", perm: "validate_qr", emoji: "📱" },
 ];
+
+/** Scanner roles are QR-only (legacy behavior). */
+const SCANNER_ROLES = ["EntryScanner", "SevaScanner", "PrasadamScanner"];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading, logout, hasPermission, isSuperuser, session } = useAuth();
@@ -85,6 +88,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       const donorAllowed = ["/dashboard", "/dashboard/bookings", "/dashboard/reports", "/dashboard/notice", "/dashboard/events", "/dashboard/profile"];
       return donorAllowed.includes(item.href);
     }
+
+    // Scanner roles (Entry/Seva/Prasadam) get only QR validation
+    if (SCANNER_ROLES.includes(user.role)) return item.href === "/dashboard/validate-qr";
 
     if (item.superadminOnly && !isSuperuser) return false;
     if (item.adminOnly && user.role === "volunteer" && !isSuperuser) {

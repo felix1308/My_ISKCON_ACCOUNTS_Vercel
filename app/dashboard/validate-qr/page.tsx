@@ -5,7 +5,10 @@ import { useAuth } from "@/lib/auth-context";
 import { callApi } from "@/lib/client";
 
 export default function ValidateQRPage() {
-  const { isSuperuser } = useAuth();
+  const { user, isSuperuser } = useAuth();
+  const scannerType = user?.role === "EntryScanner" ? "Entry (Darshan)"
+    : user?.role === "SevaScanner" ? "Seva"
+    : user?.role === "PrasadamScanner" ? "Prasadam" : null;
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<{ isOk: boolean; message?: string; error?: string } | null>(null);
   const [cameraError, setCameraError] = useState("");
@@ -77,13 +80,18 @@ export default function ValidateQRPage() {
     setResult(res as { isOk: boolean; message?: string; error?: string });
   }
 
-  if (!isSuperuser) return <div className="text-center py-12 text-theme-muted">Superadmin or Scanner access required.</div>;
+  if (!isSuperuser && !scannerType) return <div className="text-center py-12 text-theme-muted">Superadmin or Scanner access required.</div>;
 
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl card-shadow p-6">
         <h3 className="font-display text-xl font-semibold text-theme-primary mb-1">Validate Receipt QR Codes</h3>
-        <p className="text-sm text-theme-secondary mb-6">Scan Entry, Seva or Prasadam QR codes from donor receipts. Each QR can be used only once.</p>
+        <p className="text-sm text-theme-secondary mb-2">Scan Entry, Seva or Prasadam QR codes from donor receipts. Each QR can be used only once.</p>
+        {scannerType && (
+          <p className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+            Scanner account: only {scannerType} QR codes will be accepted.
+          </p>
+        )}
 
         <div className="flex flex-col items-center gap-4">
           {/* Camera viewport */}
