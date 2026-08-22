@@ -13,6 +13,7 @@ import { NextResponse } from "next/server";
 import { toApiResult, AuthError } from "@/lib/errors";
 import { addAuditLog } from "@/lib/audit";
 import { tryGetEnv } from "@/lib/env";
+import { sqlTyped } from "@/lib/db";
 import type { ApiResult } from "@/lib/types";
 
 // Allow large bodies for bulk import.
@@ -54,12 +55,25 @@ type Handler = (params: Record<string, unknown>, req: Request) => Promise<ApiRes
 
 const handlers: Record<string, Handler> = {
   // --- Unauthenticated / setup ---
-  ping: async () => ({
-    isOk: true,
-    message: "MyISKCON Backend is running",
-    version: "2.0",
-    hasRazorpay: !!tryGetEnv()?.RAZORPAY_KEY_ID,
-  }),
+  ping: async () => {
+    // Health check + lightweight DB diagnostics (counts only, no PII).
+    let donors = -1, bookings = -1, tenBeRecords = -1;
+    try {
+      const d = await sqlTyped<{ n: number }>`SELECT count(*)::int AS n FROM donors`;
+      donors = d[0]?.n ?? -1;
+      const b = await sqlTyped<{ n: number }>`SELECT count(*)::int AS n FROM bookings`;
+      bookings = b[0]?.n ?? -1;
+      const t = await sqlTyped<{ n: number }>`SELECT count(*)::int AS n FROM ten_be_records`;
+      tenBeRecords = t[0]?.n ?? -1;
+    } catch { /* counts stay -1 on failure */ }
+    return {
+      isOk: true,
+      message: "MyISKCON Backend is running",
+      version: "2.0",
+      hasRazorpay: !!tryGetEnv()?.RAZORPAY_KEY_ID,
+      dbCounts: { donors, bookings, tenBeRecords },
+    };
+  },
   login: (p, req) => handleLogin(p, req),
   selfRegister: (p, req) => handleSelfRegister(p, req),
   resetDonorPassword: (p, req) => handleResetDonorPassword(p, req),
