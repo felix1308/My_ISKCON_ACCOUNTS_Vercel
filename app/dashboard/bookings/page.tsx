@@ -603,7 +603,6 @@ export default function BookingsPage() {
           {paymentMode === "online" && gatewayInfo && (
             <div className="text-xs text-theme-muted bg-theme-page border border-theme rounded-lg px-3 py-2 mb-3">
               Payment account: <span className="font-semibold text-theme-secondary">{gatewayInfo.gatewayName}</span>
-              <span className="ml-1 font-mono">({gatewayInfo.keyId})</span>
               {gatewayInfo.source === "fallback" && <span className="ml-1">— default, no center gateway linked</span>}
             </div>
           )}
