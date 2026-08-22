@@ -372,8 +372,17 @@ export async function handleUpdate(params: {
     case "user": {
       const role = str(record.role);
       const isAdmin = role.toLowerCase() === "admin";
-      const perms = record.permissions ?? {};
-      const cashbooks = record.cashbooks ?? "";
+      // permissions/cashbooks/isActive only change when explicitly provided —
+      // otherwise a partial edit form would silently wipe them.
+      const perms = record.permissions != null ? JSON.stringify(record.permissions) : null;
+      const cb = record.cashbooks;
+      const cashbooks = cb == null ? null : (Array.isArray(cb) ? JSON.stringify(cb) : String(cb));
+      // Center changes only when a role or centerId is explicitly sent
+      // (admin role wipes center, per legacy).
+      const centerProvided = !!role || record.centerId !== undefined;
+      const centerVal = role
+        ? (isAdmin ? null : str(record.centerId) || null)
+        : (record.centerId !== undefined ? str(record.centerId) || null : null);
       // Optional password reset during update.
       const passwordHash = record.password ? await hashPassword(String(record.password)) : null;
       await sql`
@@ -382,12 +391,12 @@ export async function handleUpdate(params: {
           password_hash = COALESCE(${passwordHash}, password_hash),
           password_scheme = CASE WHEN ${passwordHash !== null} THEN 'bcrypt' ELSE password_scheme END,
           role = COALESCE(${role || null}, role),
-          center_id = ${isAdmin ? null : (str(record.centerId) || null)},
-          temple_id = ${str(record.templeId) || null},
-          department_id = ${str(record.departmentId) || null},
-          permissions = ${JSON.stringify(perms)}::jsonb,
-          cashbooks = ${Array.isArray(cashbooks) ? JSON.stringify(cashbooks) : String(cashbooks)}::jsonb,
-          is_active = ${record.isActive !== false},
+          center_id = CASE WHEN ${centerProvided} THEN ${centerVal} ELSE center_id END,
+          temple_id = COALESCE(${record.templeId !== undefined ? (str(record.templeId) || null) : null}, temple_id),
+          department_id = COALESCE(${record.departmentId !== undefined ? (str(record.departmentId) || null) : null}, department_id),
+          permissions = COALESCE(${perms}::jsonb, permissions),
+          cashbooks = COALESCE(${cashbooks}::jsonb, cashbooks),
+          is_active = COALESCE(${record.isActive == null ? null : bool(record.isActive)}, is_active),
           updated_at = ${ts}
         WHERE id = ${id}
       `;
@@ -633,7 +642,17 @@ export async function handleDelete(params: {
     switch (type) {
       case "user": await sql`UPDATE users SET is_active = FALSE, updated_at = ${ts2} WHERE id = ${id}`; break;
       case "seva": await sql`UPDATE sevas SET is_active = FALSE, updated_at = ${ts2} WHERE id = ${id}`; break;
-      case "center": await sql`UPDATE centers SET is_active = FALSE, updated_at = ${ts2} WHERE id = ${id}`; break;
+      case "center": {
+        // Legacy guard: a center with donors or active users cannot be deleted.
+        const d = await sqlOne<{ n: number }>`SELECT count(*)::int AS n FROM donors WHERE center_id = ${id}`;
+        const u = await sqlOne<{ n: number }>`SELECT count(*)::int AS n FROM users WHERE center_id = ${id} AND is_active = TRUE`;
+        const dn = d?.n ?? 0, un = u?.n ?? 0;
+        if (dn > 0 || un > 0) {
+          return { isOk: false, error: `Cannot delete: this center has ${dn} donor(s) and ${un} active user(s). Reassign them first.` };
+        }
+        await sql`UPDATE centers SET is_active = FALSE, updated_at = ${ts2} WHERE id = ${id}`;
+        break;
+      }
       case "temple": await sql`UPDATE temples SET is_active = FALSE, updated_at = ${ts2} WHERE id = ${id}`; break;
       case "department": await sql`UPDATE departments SET is_active = FALSE, updated_at = ${ts2} WHERE id = ${id}`; break;
       case "department_head":
