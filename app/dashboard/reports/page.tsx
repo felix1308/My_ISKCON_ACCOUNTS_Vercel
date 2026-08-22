@@ -15,6 +15,7 @@ interface BookingRecord {
   remarks: string;
   razorpayOrderId?: string; razorpayPaymentId?: string; paidAt?: string;
   createdAt?: string;
+  has10Be?: boolean;
 }
 interface DonorRecord {
   __backendId: string; name: string; mobile: string; email: string; pan: string;
@@ -359,7 +360,9 @@ export default function ReportsPage() {
                 const isPending = b.paymentStatus !== "paid";
                 const remarks10beUrl = parse10beUrlFromRemarks(b.remarks);
                 const voucherNo = parseVoucherNoFromRemarks(b.remarks);
-                const can10be = !!remarks10beUrl || !!voucherNo;
+                // Button enabled only when a certificate actually exists:
+                // direct URL in remarks, or the server-flagged record match.
+                const can10be = !!remarks10beUrl || b.has10Be === true;
                 return (
                   <tr key={b.__backendId} className="hover:bg-theme-page transition">
                     <td className="px-3 py-2.5 text-theme-secondary">{formatDate(b.bookingDate)}</td>
@@ -393,7 +396,7 @@ export default function ReportsPage() {
                         <button
                           onClick={() => handle10be(b)}
                           disabled={!can10be || tenbeLoadingId === b.__backendId}
-                          title={can10be ? "Download 10BE receipt" : "No 10BE (no voucher/URL in remarks)"}
+                          title={can10be ? "Download 10BE certificate" : "10BE not available yet (certificates are issued annually per financial year)"}
                           className={`px-2 py-1 rounded text-xs font-medium transition ${
                             can10be
                               ? "bg-green-100 text-green-800 hover:bg-green-200"

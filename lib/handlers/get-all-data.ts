@@ -140,6 +140,14 @@ export async function handleGetAllData(params: {
            razorpay_payment_id, paid_at, remarks, created_at
     FROM bookings
   `;
+  // 10BE availability map: "voucher|paise" for every imported certificate.
+  // Lets the UI disable the 10BE button when no certificate can exist.
+  const tenBeRows = await sqlTyped<{ voucher_no: string; amount: number }>`
+    SELECT voucher_no, amount FROM ten_be_records
+  `;
+  const tenBeSet = new Set(
+    tenBeRows.map((t) => `${String(t.voucher_no ?? "").trim().toLowerCase()}|${Math.round(Number(t.amount ?? 0) * 100)}`)
+  );
   for (const b of bookingRows) {
     if (principal.role === "donor") {
       if (b.donor_id !== principal.donorId) continue;
@@ -147,6 +155,11 @@ export async function handleGetAllData(params: {
       const bCenter = String(b.center_id ?? "").trim();
       if (bCenter && !allowedSet.has(bCenter)) continue;
     }
+    const remarks = String(b.remarks ?? "");
+    const vm = String(remarks).match(/voucherNo:(.+?)(?:\s*\|[^|]*bank:|$)/);
+    const voucher = vm ? vm[1].trim().toLowerCase() : "";
+    const paise = Math.round(Number(b.total_amount ?? 0) * 100);
+    const has10Be = remarks.includes("10beUrl:") || (voucher !== "" && tenBeSet.has(`${voucher}|${paise}`));
     out.push({
       type: "booking",
       __backendId: b.id,
@@ -164,7 +177,8 @@ export async function handleGetAllData(params: {
       razorpayOrderId: b.razorpay_order_id ?? "",
       razorpayPaymentId: b.razorpay_payment_id ?? "",
       paidAt: b.paid_at ?? "",
-      remarks: b.remarks ?? "",
+      remarks,
+      has10Be,
       createdAt: b.created_at,
     });
   }
