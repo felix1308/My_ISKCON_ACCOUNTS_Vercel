@@ -13,7 +13,8 @@
 /** Remove any leftover Razorpay checkout modal DOM before a new open(). */
 export function cleanupRazorpayModals(): void {
   if (typeof document === "undefined") return;
-  document
-    .querySelectorAll(".razorpay-container, .razorpay-backdrop, iframe[name^='razorpay'], iframe[src*='razorpay']")
-    .forEach((el) => el.remove());
+  // Only the visible modal overlay. Do NOT remove razorpay iframes — one of
+  // them is checkout.js's internal communication frame; deleting it breaks
+  // initialization entirely ("This browser is not supported" alert).
+  document.querySelectorAll(".razorpay-container").forEach((el) => el.remove());
 }
