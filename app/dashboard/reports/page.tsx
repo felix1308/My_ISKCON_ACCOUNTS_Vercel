@@ -214,7 +214,7 @@ export default function ReportsPage() {
       if (result.isOk && url) {
         window.open(url, "_blank", "noopener");
       } else {
-        alert("No 10BE receipt found for this booking.");
+        alert("No 10BE certificate found for this transaction.\n\n10BEs are issued once a year per financial year by the office. Recent donations (current financial year) will not have one yet.");
       }
     } finally {
       setTenbeLoadingId(null);
