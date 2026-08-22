@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useAllData, byType } from "@/lib/use-all-data";
 import { useAuth } from "@/lib/auth-context";
 import { callApi } from "@/lib/client";
+import { cleanupRazorpayModals } from "@/lib/razorpay-checkout";
 
 interface BookingRecord {
   __backendId: string; donorId: string; items: Array<{ name?: string; sevaId?: string; amount?: number; quantity?: number; bookingDate?: string }>;
@@ -325,6 +326,7 @@ export default function BookingsPage() {
         },
       };
 
+      cleanupRazorpayModals(); // stale modal keeps the previous order's UPI QR
       const rzp = new RazorpayClass(rzpOptions);
       rzp.open();
     } catch (e) {

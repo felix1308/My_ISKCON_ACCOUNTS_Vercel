@@ -7,6 +7,7 @@ import { callApi } from "@/lib/client";
 import { formatDate } from "@/lib/format";
 import { loadSheetJs } from "@/lib/excel";
 import { openReceiptsWindow } from "@/lib/receipt";
+import { cleanupRazorpayModals } from "@/lib/razorpay-checkout";
 
 interface BookingRecord {
   __backendId: string; totalAmount: number; paymentStatus: string; bookingDate: string;
@@ -247,6 +248,7 @@ export default function ReportsPage() {
       const paymentGatewayId = (order.paymentGatewayId as string) || "";
       const donor = findDonor(b.donorId);
 
+      cleanupRazorpayModals(); // stale modal keeps the previous order's UPI QR
       const rzp = new RazorpayClass({
         key: order.keyId,
         amount: order.amount,
