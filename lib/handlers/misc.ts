@@ -58,10 +58,17 @@ export async function validateQR(params: {
     return { isOk: false, error: `This scanner accepts only ${label} QR codes. Wrong QR type.` };
   }
 
-  const booking = await sqlOne<{ payment_status: string }>`SELECT payment_status FROM bookings WHERE id = ${bookingId} LIMIT 1`;
+  const booking = await sqlOne<{ payment_status: string; payment_mode: string; razorpay_payment_id: string }>`
+    SELECT payment_status, payment_mode, razorpay_payment_id FROM bookings WHERE id = ${bookingId} LIMIT 1
+  `;
   if (!booking) return { isOk: false, error: "Booking not found" };
   if (String(booking.payment_status).toLowerCase() !== "paid") {
     return { isOk: false, error: "Booking is not paid" };
+  }
+  // Online bookings must carry the HMAC-verified Razorpay payment id —
+  // a paid flag alone is not proof for online payments.
+  if (String(booking.payment_mode).toLowerCase() === "online" && !String(booking.razorpay_payment_id ?? "").trim()) {
+    return { isOk: false, error: "Online payment not verified for this booking" };
   }
 
   const already = await sqlOne<{ scanned_at: string; scanned_by: string }>`

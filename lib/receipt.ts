@@ -22,6 +22,7 @@ export interface ReceiptBooking {
   __backendId: string;
   bookingDate: string;
   paymentStatus: string;
+  paymentMode?: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   paidAt?: string;
@@ -71,7 +72,13 @@ function buildReceiptHtml(
   index: number,
   sevas: ReceiptSeva[]
 ): string {
-  const isPaid = (booking.paymentStatus || "pending") === "paid";
+  // QR codes are entry passes — only generate them when payment is proven.
+  // Online bookings require a Razorpay payment id (HMAC-verified server-side);
+  // cash/cheque/UPI are physically collected at the counter, so paid = proven.
+  const statusPaid = (booking.paymentStatus || "pending").toLowerCase() === "paid";
+  const mode = (booking.paymentMode || "online").toLowerCase();
+  const paymentProven = statusPaid && (mode !== "online" || !!booking.razorpayPaymentId);
+  const isPaid = paymentProven;
   const receiptNumber = `RCP-${booking.__backendId.substring(0, 8)}-${index + 1}`;
   const d = new Date(booking.bookingDate);
   const transactionDate = isNaN(d.getTime())
@@ -116,7 +123,7 @@ function buildReceiptHtml(
 
   const pendingNotice = isPaid
     ? ""
-    : `<div style="margin:8px 0;padding:6px 10px;border:1px dashed #f59e0b;background:#fffbeb;color:#92400e;border-radius:6px;font-size:10px;text-align:center;flex-shrink:0;"><strong>Payment pending:</strong> QR codes will appear after payment is marked as <strong>Paid</strong>.</div>`;
+    : `<div style="margin:8px 0;padding:6px 10px;border:1px dashed #f59e0b;background:#fffbeb;color:#92400e;border-radius:6px;font-size:10px;text-align:center;flex-shrink:0;"><strong>${statusPaid ? "Online payment not verified" : "Payment pending"}:</strong> QR codes will appear only after payment is verified.</div>`;
 
   return `
     <div class="receipt" style="width:210mm;min-height:148mm;margin:8px auto;padding:16px;font-family:Arial, Helvetica, sans-serif;border:2px solid #c9a24d;border-radius:8px;background:#fffdf7;color:#333;box-sizing:border-box;display:flex;flex-direction:column;page-break-after:always;overflow:visible;">
