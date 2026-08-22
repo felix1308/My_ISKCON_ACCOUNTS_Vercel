@@ -85,10 +85,11 @@ export async function handleGetAllData(params: {
   `;
   for (const d of donorRows) {
     const dCenter = String(d.center_id ?? "").trim();
+    // Donors must see ONLY their own record — never other donors in their center.
     const include =
-      isSuperuserRole(principal.role) ||
-      (principal.role === "donor" && d.id === principal.donorId) ||
-      allowedSet.has(dCenter);
+      principal.role === "donor"
+        ? d.id === principal.donorId
+        : isSuperuserRole(principal.role) || allowedSet.has(dCenter);
     if (!include) continue;
 
     let pan = "";

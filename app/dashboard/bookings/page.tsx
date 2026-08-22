@@ -66,14 +66,15 @@ export default function BookingsPage() {
     return donors.filter((d) => d.mobile?.includes(q) || d.name?.toLowerCase().includes(q)).slice(0, 10);
   }, [mobileSearch, donors]);
 
-  // ---- Donor self-booking: auto-select own record (donors only see
-  //      themselves in getAllData, so donors[0] is their record). ----
+  // ---- Donor self-booking: auto-select the logged-in donor's own record.
+  //      Match by session donorId explicitly — never assume list order. ----
   useEffect(() => {
     if (isDonor && !selectedDonorId && donors.length > 0) {
-      selectDonor(donors[0]);
+      const own = donors.find((d) => d.__backendId === user?.donorId);
+      if (own) selectDonor(own);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDonor, donors, selectedDonorId]);
+  }, [isDonor, donors, selectedDonorId, user?.donorId]);
 
   // ---- Sevas for selected center ----
   const sevasForCenter = useMemo(() => {
