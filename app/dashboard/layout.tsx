@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import type { Permissions, Role } from "@/lib/types";
 
-const ISKCON_LOGO = "https://iskconsouthbengaluru.com/wp-content/uploads/sites/7/2022/03/cropped-ISB-vertical-logo-Red-2.png";
+const ISKCON_LOGO = "/iskcon-logo.png";
 
 interface NavItem {
   label: string;
