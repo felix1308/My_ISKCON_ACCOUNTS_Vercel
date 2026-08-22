@@ -77,6 +77,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return null;
   }
 
+  // Scanner roles are QR-only: force them onto the Validate QR page.
+  if (SCANNER_ROLES.includes(user.role) && pathname !== "/dashboard/validate-qr") {
+    router.replace("/dashboard/validate-qr");
+    return null;
+  }
+
   // Filter nav items based on role and permissions
   const visibleNav = NAV_ITEMS.filter((item) => {
     // Donor-only items

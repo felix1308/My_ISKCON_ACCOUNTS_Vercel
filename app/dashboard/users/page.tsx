@@ -5,6 +5,15 @@ import { useAllData, byType } from "@/lib/use-all-data";
 import { useAuth } from "@/lib/auth-context";
 import { callApi } from "@/lib/client";
 
+const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "volunteer", label: "Volunteer" },
+  { value: "admin", label: "Admin" },
+  { value: "EntryScanner", label: "Entry Scanner (QR)" },
+  { value: "SevaScanner", label: "Seva Scanner (QR)" },
+  { value: "PrasadamScanner", label: "Prasadam Scanner (QR)" },
+];
+const roleLabel = (r: string) => ROLE_OPTIONS.find((o) => o.value === r)?.label ?? r;
+
 export default function UsersPage() {
   const { data, loading, reload } = useAllData();
   const { isSuperuser } = useAuth();
@@ -37,8 +46,7 @@ export default function UsersPage() {
             <input className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" placeholder="Username *" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
             <input type="password" className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" placeholder="Password *" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
             <select className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-              <option value="volunteer">Volunteer</option>
-              <option value="admin">Admin</option>
+              {ROLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <select className="px-3 py-2 border border-theme rounded-lg theme-focus text-sm" value={form.centerId} onChange={(e) => setForm({ ...form, centerId: e.target.value })}>
               <option value="">Select center</option>
@@ -61,7 +69,7 @@ export default function UsersPage() {
             {users.map((u) => (
               <tr key={u.__backendId} className="hover:bg-theme-page transition">
                 <td className="px-4 py-2.5 font-medium text-theme-primary">{u.username}</td>
-                <td className="px-4 py-2.5"><span className="capitalize px-2 py-0.5 rounded-full text-xs bg-theme-muted text-theme-secondary">{u.role}</span></td>
+                <td className="px-4 py-2.5"><span className="px-2 py-0.5 rounded-full text-xs bg-theme-muted text-theme-secondary">{roleLabel(u.role)}</span></td>
                 <td className="px-4 py-2.5 text-theme-secondary">{centers.find((c) => c.id === u.centerId)?.name || u.centerId || "—"}</td>
                 <td className="px-4 py-2.5 text-theme-secondary">{u.createdBy || "—"}</td>
               </tr>
