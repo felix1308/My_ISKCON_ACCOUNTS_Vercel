@@ -60,13 +60,29 @@ export async function lookup10BeUrl(params: {
 }, req: Request): Promise<ApiResult> {
   void req;
   const principal = await resolvePrincipal(params.sessionId);
-  // Same gate as the Acknowledgement / 10BE buttons in reports.
-  if (!isSuperuserRole(principal.role) && principal.permissions?.receipts !== true) {
+  const voucherForOwnership = normVoucher(params.voucherNo);
+
+  if (principal.role === "donor") {
+    // Donors may fetch 10BE links only for vouchers attached to their own
+    // bookings — prevents enumerating other donors' certificates.
+    const own = await sqlTyped<{ id: string }>`
+      SELECT id FROM bookings
+      WHERE donor_id = ${principal.donorId ?? ""}
+        AND (
+          lower(remarks) = ${"voucherno:" + voucherForOwnership}
+          OR lower(remarks) LIKE ${"voucherno:" + voucherForOwnership + " |%"}
+        )
+      LIMIT 1
+    `;
+    if (!own.length) {
+      throw new ForbiddenError("You do not have permission to download 10BE receipts");
+    }
+  } else if (!isSuperuserRole(principal.role) && principal.permissions?.receipts !== true) {
     throw new ForbiddenError("You do not have permission to download 10BE receipts");
   }
 
   const pan = normPan(params.pan);
-  const voucher = normVoucher(params.voucherNo);
+  const voucher = voucherForOwnership;
   const amountPaise = normAmountPaise(params.amount);
   const date = normDate(params.date);
 

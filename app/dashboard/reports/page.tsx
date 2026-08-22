@@ -53,8 +53,10 @@ export default function ReportsPage() {
   const centers = byType<CenterRecord>(data, "center");
   const sevas = byType<SevaRecord>(data, "seva");
 
-  const canReceipts = hasPermission("receipts") || isSuperuser;
+  // Donors can always receipt/download their own bookings (they only ever
+  // see their own rows here); staff need the receipts permission.
   const isDonorView = user?.isDonor === true;
+  const canReceipts = hasPermission("receipts") || isSuperuser || isDonorView;
 
   // Unique collectors
   const collectors = useMemo(() => {
@@ -373,7 +375,7 @@ export default function ReportsPage() {
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {isPending && !isDonorView && (
+                        {isPending && (
                           <button
                             onClick={() => handlePayNow(b)}
                             disabled={payingId === b.__backendId}
