@@ -55,7 +55,7 @@ export default function PermissionsPage() {
     const newPerms = { ...perms, [permId]: !perms[permId] };
     setSaving(`${user.__backendId}-${permId}`);
     await callApi("update", {
-      record: { type: "user", __backendId: user.__backendId, permissions: JSON.stringify(newPerms) },
+      record: { type: "user", __backendId: user.__backendId, permissions: newPerms },
     });
     setSaving(null);
     reload();

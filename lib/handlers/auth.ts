@@ -249,14 +249,21 @@ export async function handleLogin(params: {
         if (dept?.center_id) resolvedCenterId = dept.center_id;
       }
 
-      const perms = userRow.permissions && typeof userRow.permissions === "object"
-        ? (userRow.permissions as Permissions)
-        : {};
+      // jsonb may hold an object OR a (possibly legacy double-encoded) string.
+      const parseJsonb = <T>(v: unknown, fallback: T): T => {
+        if (v && typeof v === "object") return v as T;
+        if (typeof v === "string") {
+          try {
+            const o = JSON.parse(v);
+            if (o && typeof o === "object") return o as T;
+          } catch { /* */ }
+        }
+        return fallback;
+      };
+      const perms = parseJsonb<Permissions>(userRow.permissions, {});
       const cashbooks = userRow.cashbooks === "*"
         ? "*"
-        : Array.isArray(userRow.cashbooks)
-          ? (userRow.cashbooks as string[])
-          : [];
+        : parseJsonb<string[]>(userRow.cashbooks, []);
 
       const session = await createSession({
         userId: userRow.id,

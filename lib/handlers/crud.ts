@@ -382,9 +382,19 @@ export async function handleUpdate(params: {
       const isAdmin = role.toLowerCase() === "admin";
       // permissions/cashbooks/isActive only change when explicitly provided —
       // otherwise a partial edit form would silently wipe them.
-      const perms = record.permissions != null ? JSON.stringify(record.permissions) : null;
-      const cb = record.cashbooks;
-      const cashbooks = cb == null ? null : (Array.isArray(cb) ? JSON.stringify(cb) : String(cb));
+      // Both arrive as either an object/array or a JSON string (some pages
+      // stringify before sending). Normalize so the jsonb column ALWAYS holds
+      // a real object/array, never a double-encoded string.
+      const asJson = (v: unknown): string | null => {
+        if (v == null) return null;
+        if (typeof v === "string") {
+          const t = v.trim();
+          try { JSON.parse(t); return t; } catch { return JSON.stringify(v); }
+        }
+        return JSON.stringify(v);
+      };
+      const perms = asJson(record.permissions);
+      const cashbooks = asJson(record.cashbooks);
       // Center changes only when a role or centerId is explicitly sent
       // (admin role wipes center, per legacy).
       const centerProvided = !!role || record.centerId !== undefined;
