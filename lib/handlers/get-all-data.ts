@@ -53,10 +53,10 @@ export async function handleGetAllData(params: {
       const uTemple = String(u.temple_id ?? "").trim();
       let include = false;
       if (isSuperuserRole(principal.role)) include = true;
-      else if (principal.role === "admin") {
-        include = allowedSet.has(uCenter) || (u.role === "admin" && uTemple === (principal.templeId ?? "").trim());
-      } else {
-        include = uCenter === principal.centerId;
+      else {
+        // Strict center scoping (owner decision): admins/volunteers see only
+        // their own center's users, plus always themselves.
+        include = allowedSet.has(uCenter) || u.id === principal.backendId;
       }
       if (include) {
         out.push({

@@ -114,7 +114,7 @@ export async function handleCreate(params: {
                            temple_id, department_id, permissions, cashbooks, created_by,
                            created_at, updated_at, is_active)
         VALUES (${id}, ${str(record.username)}, ${await hashPassword(String(record.password))},
-                'bcrypt', ${role}, ${isAdmin ? null : centerId || null},
+                'bcrypt', ${role}, ${centerId || null},
                 ${templeId || null}, ${str(record.departmentId) || null},
                 ${JSON.stringify(perms)}::jsonb,
                 ${cashbooksJson}::jsonb,
@@ -122,7 +122,7 @@ export async function handleCreate(params: {
       `;
       newRecord = {
         type, __backendId: id, username: record.username, role,
-        centerId: isAdmin ? "" : centerId, templeId: isAdmin ? templeId : templeId,
+        centerId, templeId,
         departmentId: str(record.departmentId), permissions: perms, cashbooks,
         createdBy: principal.username, createdAt: ts,
       };
@@ -379,7 +379,6 @@ export async function handleUpdate(params: {
   switch (type) {
     case "user": {
       const role = str(record.role);
-      const isAdmin = role.toLowerCase() === "admin";
       // permissions/cashbooks/isActive only change when explicitly provided —
       // otherwise a partial edit form would silently wipe them.
       // Both arrive as either an object/array or a JSON string (some pages
@@ -395,12 +394,9 @@ export async function handleUpdate(params: {
       };
       const perms = asJson(record.permissions);
       const cashbooks = asJson(record.cashbooks);
-      // Center changes only when a role or centerId is explicitly sent
-      // (admin role wipes center, per legacy).
-      const centerProvided = !!role || record.centerId !== undefined;
-      const centerVal = role
-        ? (isAdmin ? null : str(record.centerId) || null)
-        : (record.centerId !== undefined ? str(record.centerId) || null : null);
+      // Center changes only when centerId is explicitly sent.
+      const centerProvided = record.centerId !== undefined;
+      const centerVal = centerProvided ? str(record.centerId) || null : null;
       // Optional password reset during update.
       const passwordHash = record.password ? await hashPassword(String(record.password)) : null;
       await sql`

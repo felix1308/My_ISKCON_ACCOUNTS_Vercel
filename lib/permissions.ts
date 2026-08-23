@@ -9,27 +9,16 @@ import type { Permissions, Principal, Role } from "./types";
 /**
  * Get center IDs the principal is allowed to access.
  *   developer / superadmin: all active centers
- *   admin:                   all active centers under their temple (fallback: own centerId)
- *   everyone else:           their own centerId (resolved at login time)
+ *   everyone else (admin, volunteer, dept staff, ...): their OWN center only.
+ *
+ * Owner decision (Aug 2026): admins and volunteers are strictly center-scoped;
+ * the legacy temple-wide visibility for admins was removed.
  */
 export async function getAllowedCenterIdsForUser(p: Principal): Promise<string[]> {
   if ((p.role as string) === "developer" || (p.role as string) === "superadmin") {
     const rows = await sqlTyped<{ id: string }>`SELECT id FROM centers WHERE is_active = TRUE`;
     return rows.map((r) => r.id);
   }
-  if (p.role === "admin") {
-    const templeId = (p.templeId ?? "").trim();
-    if (templeId) {
-      const rows = await sqlTyped<{ id: string }>`
-        SELECT id FROM centers WHERE is_active = TRUE AND temple_id = ${templeId}
-      `;
-      return rows.map((r) => r.id);
-    }
-    const legacy = (p.centerId ?? "").trim();
-    if (legacy && legacy !== "all_centers") return [legacy];
-    return [];
-  }
-  // Department users / volunteers / etc.: single center (already resolved).
   if (p.centerId && p.centerId !== "all_centers") return [p.centerId];
   return [];
 }
