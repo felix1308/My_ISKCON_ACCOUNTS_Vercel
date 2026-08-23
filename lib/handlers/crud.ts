@@ -93,14 +93,22 @@ export async function handleCreate(params: {
       const isAdmin = role.toLowerCase() === "admin";
       const templeId = str(record.templeId);
       const centerId = str(record.centerId);
-      const dup = await sqlOne<{ id: string }>`
-        SELECT id FROM users WHERE username = ${record.username}
-        AND ${isAdmin ? sql`temple_id` : sql`center_id`} = ${isAdmin ? templeId || null : centerId || null}
-        LIMIT 1
-      `;
+      // Note: column names cannot be parameterized — keep two static queries.
+      const dup = isAdmin
+        ? await sqlOne<{ id: string }>`
+            SELECT id FROM users WHERE username = ${record.username}
+              AND temple_id = ${templeId || null} LIMIT 1
+          `
+        : await sqlOne<{ id: string }>`
+            SELECT id FROM users WHERE username = ${record.username}
+              AND center_id = ${centerId || null} LIMIT 1
+          `;
       if (dup) return { isOk: false, error: `Username already exists in this ${isAdmin ? "temple" : "center"}` };
       const perms = record.permissions ?? {};
-      const cashbooks = record.cashbooks ?? "";
+      const cashbooks = record.cashbooks;
+      const cashbooksJson = Array.isArray(cashbooks)
+        ? JSON.stringify(cashbooks)
+        : (String(cashbooks ?? "").trim() || "[]"); // '' is invalid JSON
       await sql`
         INSERT INTO users (id, username, password_hash, password_scheme, role, center_id,
                            temple_id, department_id, permissions, cashbooks, created_by,
@@ -109,7 +117,7 @@ export async function handleCreate(params: {
                 'bcrypt', ${role}, ${isAdmin ? null : centerId || null},
                 ${templeId || null}, ${str(record.departmentId) || null},
                 ${JSON.stringify(perms)}::jsonb,
-                ${Array.isArray(cashbooks) ? JSON.stringify(cashbooks) : cashbooks}::jsonb,
+                ${cashbooksJson}::jsonb,
                 ${principal.username}, ${ts}, ${ts}, TRUE)
       `;
       newRecord = {
