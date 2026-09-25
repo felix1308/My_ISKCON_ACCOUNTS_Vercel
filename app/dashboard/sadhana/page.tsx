@@ -13,11 +13,14 @@ import { Bar } from "react-chartjs-2";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend);
 
+interface ChantingSitting { time: string; rounds: number; }
+
 interface SadhanaEntry {
   entryDate: string;
   wakeUpAt: string;
   sleepAt: string;
   chantingRounds: number;
+  chantingSessions: ChantingSitting[];
   hearingMinutes: number;
   readingMinutes: number;
   readingBook: string;
@@ -56,7 +59,7 @@ const QUOTES = [
 ];
 
 const EMPTY: Omit<SadhanaEntry, "entryDate"> = {
-  wakeUpAt: "", sleepAt: "", chantingRounds: 0, hearingMinutes: 0,
+  wakeUpAt: "", sleepAt: "", chantingRounds: 0, chantingSessions: [], hearingMinutes: 0,
   readingMinutes: 0, readingBook: "", serviceMinutes: 0, serviceNote: "", notes: "",
 };
 
@@ -155,7 +158,9 @@ export default function SadhanaPortal() {
   };
 
   const dur = sleepDuration(form.sleepAt, form.wakeUpAt);
-  const roundPct = Math.min(1, form.chantingRounds / TARGET_ROUNDS);
+  const sittingsTotal = form.chantingSessions.reduce((s, x) => s + (x.rounds || 0), 0);
+  const chantingTotal = form.chantingSessions.length > 0 ? sittingsTotal : form.chantingRounds;
+  const roundPct = Math.min(1, chantingTotal / TARGET_ROUNDS);
   const RING_R = 56;
   const RING_C = 2 * Math.PI * RING_R;
 
@@ -212,9 +217,9 @@ export default function SadhanaPortal() {
             {/* ===== The 5 avenues ===== */}
             <div className="grid md:grid-cols-2 gap-4 mb-4">
 
-              {/* Chanting — progress ring */}
-              <div className="portal-card p-6 portal-rise" style={{ ["--i" as string]: 3 }}>
-                <div className="flex items-center gap-6">
+              {/* Chanting — progress ring + time-stamped sittings */}
+              <div className="portal-card p-6 md:col-span-2 portal-rise" style={{ ["--i" as string]: 3 }}>
+                <div className="flex flex-wrap items-center gap-6">
                   <div className="relative" style={{ width: 128, height: 128 }}>
                     <svg width="128" height="128" className={roundPct >= 1 ? "ring-complete" : ""}>
                       <circle cx="64" cy="64" r={RING_R} fill="none" stroke="rgba(201,162,77,0.18)" strokeWidth="9" />
@@ -226,20 +231,48 @@ export default function SadhanaPortal() {
                         style={{ transition: "stroke-dashoffset 0.5s cubic-bezier(0.22,1,0.36,1)" }} />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="font-display text-3xl font-bold" style={{ color: "#e8c877" }}>{form.chantingRounds}</span>
+                      <span className="font-display text-3xl font-bold" style={{ color: "#e8c877" }}>{chantingTotal}</span>
                       <span className="text-[10px] opacity-70">of {TARGET_ROUNDS}</span>
                     </div>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-56">
                     <h3 className="font-display text-xl font-bold" style={{ color: "#f5e9da" }}>Chanting</h3>
-                    <p className="text-xs opacity-60 mb-3">Rounds of the Hare Krishna maha-mantra</p>
-                    <div className="flex items-center gap-2">
-                      <button className="portal-stepper" onClick={() => step("chantingRounds", -1, 500)} aria-label="fewer rounds">−</button>
-                      <input type="number" min={0} className="portal-input text-center" style={{ width: 64 }}
-                        value={form.chantingRounds || ""} placeholder="0"
-                        onChange={(e) => setForm({ ...form, chantingRounds: Math.max(0, Number(e.target.value) || 0) })} />
-                      <button className="portal-stepper" onClick={() => step("chantingRounds", 1, 500)} aria-label="more rounds">+</button>
+                    <p className="text-xs opacity-60 mb-3">Rounds of the Hare Krishna maha-mantra, sitting by sitting</p>
+
+                    {/* sittings list */}
+                    <div className="space-y-2 mb-2">
+                      {form.chantingSessions.map((s, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input type="time" value={s.time} aria-label="sitting time"
+                            onChange={(e) => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.map((x, i) => i === idx ? { ...x, time: e.target.value } : x) }))}
+                            className="portal-input" style={{ width: 110 }} />
+                          <button className="portal-stepper" onClick={() => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.map((x, i) => i === idx ? { ...x, rounds: Math.max(0, x.rounds - 1) } : x) }))} aria-label="fewer rounds">−</button>
+                          <input type="number" min={0} aria-label="rounds in sitting"
+                            value={s.rounds || ""} placeholder="0"
+                            onChange={(e) => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.map((x, i) => i === idx ? { ...x, rounds: Math.max(0, Number(e.target.value) || 0) } : x) }))}
+                            className="portal-input text-center" style={{ width: 64 }} />
+                          <button className="portal-stepper" onClick={() => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.map((x, i) => i === idx ? { ...x, rounds: x.rounds + 1 } : x) }))} aria-label="more rounds">+</button>
+                          <span className="text-[10px] opacity-60">rounds</span>
+                          <button onClick={() => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.filter((_, i) => i !== idx) }))}
+                            className="text-red-300/70 hover:text-red-300 text-lg leading-none ml-1" aria-label="remove sitting">×</button>
+                        </div>
+                      ))}
                     </div>
+                    <button
+                      onClick={() => setForm((f) => ({ ...f, chantingSessions: [...f.chantingSessions, { time: "", rounds: 0 }] }))}
+                      className="portal-btn-ghost text-xs">+ Add sitting</button>
+
+                    {/* simple total when no sittings are used */}
+                    {form.chantingSessions.length === 0 && (
+                      <div className="flex items-center gap-2 mt-3">
+                        <button className="portal-stepper" onClick={() => step("chantingRounds", -1, 500)} aria-label="fewer rounds">−</button>
+                        <input type="number" min={0} className="portal-input text-center" style={{ width: 64 }}
+                          value={form.chantingRounds || ""} placeholder="0"
+                          onChange={(e) => setForm({ ...form, chantingRounds: Math.max(0, Number(e.target.value) || 0) })} />
+                        <button className="portal-stepper" onClick={() => step("chantingRounds", 1, 500)} aria-label="more rounds">+</button>
+                        <span className="text-xs opacity-50">or just a daily total</span>
+                      </div>
+                    )}
                     {roundPct >= 1 && <p className="text-xs mt-2 font-medium" style={{ color: "#e8c877" }}>All 16 rounds complete — Haribol!</p>}
                   </div>
                 </div>

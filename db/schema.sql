@@ -379,6 +379,7 @@ CREATE TABLE IF NOT EXISTS sadhana_entries (
   reading_minutes  INT  NOT NULL DEFAULT 0,
   reading_book     TEXT NOT NULL DEFAULT '',
   service_minutes  INT  NOT NULL DEFAULT 0,
+  chanting_sessions JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{time:"05:30", rounds:4}, ...] sittings through the day
   service_note     TEXT NOT NULL DEFAULT '',
   notes            TEXT NOT NULL DEFAULT '',
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -386,6 +387,7 @@ CREATE TABLE IF NOT EXISTS sadhana_entries (
   UNIQUE (principal_id, principal_type, entry_date)
 );
 CREATE INDEX IF NOT EXISTS idx_sadhana_owner ON sadhana_entries(principal_id, entry_date DESC);
+ALTER TABLE sadhana_entries ADD COLUMN IF NOT EXISTS chanting_sessions JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 -- ---------------------------------------------------------------------------
 -- updated_at trigger (kept lightweight; one function reused by all tables)

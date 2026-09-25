@@ -50,10 +50,24 @@ export async function saveSadhanaEntry(params: {
   if (sleepAt && !TIME_RE.test(sleepAt)) return { isOk: false, error: "Sleep time must be HH:MM" };
 
   const id = `sad_${owner.id}_${entryDate}`;
+
+  // Chanting sittings: [{time:"05:30", rounds:4}, ...]. When present, the
+  // daily total is the sum of sittings; otherwise the plain total is used.
+  const sessionsIn = Array.isArray(e.chantingSessions) ? e.chantingSessions : [];
+  const sessions = sessionsIn.slice(0, 24).map((s) => {
+    const o = (s ?? {}) as Record<string, unknown>;
+    const time = str(o.time, 5);
+    return { time: TIME_RE.test(time) ? time : "", rounds: clampInt(o.rounds, 500) };
+  }).filter((s) => s.rounds > 0);
+  const chantingRounds = sessions.length > 0
+    ? sessions.reduce((sum, s) => sum + s.rounds, 0)
+    : clampInt(e.chantingRounds, 500);
+
   const vals = {
     wakeUpAt,
     sleepAt,
-    chantingRounds: clampInt(e.chantingRounds, 500),
+    chantingRounds,
+    chantingSessions: JSON.stringify(sessions),
     hearingMinutes: clampInt(e.hearingMinutes, 1440),
     readingMinutes: clampInt(e.readingMinutes, 1440),
     readingBook: str(e.readingBook, 200),
@@ -65,16 +79,17 @@ export async function saveSadhanaEntry(params: {
   await sql`
     INSERT INTO sadhana_entries
       (id, principal_id, principal_type, entry_date, wake_up_at, sleep_at,
-       chanting_rounds, hearing_minutes, reading_minutes, reading_book,
+       chanting_rounds, chanting_sessions, hearing_minutes, reading_minutes, reading_book,
        service_minutes, service_note, notes)
     VALUES
       (${id}, ${owner.id}, ${owner.type}, ${entryDate}, ${vals.wakeUpAt}, ${vals.sleepAt},
-       ${vals.chantingRounds}, ${vals.hearingMinutes}, ${vals.readingMinutes}, ${vals.readingBook},
+       ${vals.chantingRounds}, ${vals.chantingSessions}::jsonb, ${vals.hearingMinutes}, ${vals.readingMinutes}, ${vals.readingBook},
        ${vals.serviceMinutes}, ${vals.serviceNote}, ${vals.notes})
     ON CONFLICT (principal_id, principal_type, entry_date) DO UPDATE SET
       wake_up_at = EXCLUDED.wake_up_at,
       sleep_at = EXCLUDED.sleep_at,
       chanting_rounds = EXCLUDED.chanting_rounds,
+      chanting_sessions = EXCLUDED.chanting_sessions,
       hearing_minutes = EXCLUDED.hearing_minutes,
       reading_minutes = EXCLUDED.reading_minutes,
       reading_book = EXCLUDED.reading_book,
@@ -104,7 +119,7 @@ export async function getSadhanaEntries(params: {
   const to = str(params.to, 10);
 
   const rows = await sqlTyped<Record<string, unknown>>`
-    SELECT entry_date, wake_up_at, sleep_at, chanting_rounds, hearing_minutes,
+    SELECT entry_date, wake_up_at, sleep_at, chanting_rounds, chanting_sessions, hearing_minutes,
            reading_minutes, reading_book, service_minutes, service_note, notes,
            created_at, updated_at
     FROM sadhana_entries
@@ -120,6 +135,7 @@ export async function getSadhanaEntries(params: {
     wakeUpAt: r.wake_up_at,
     sleepAt: r.sleep_at,
     chantingRounds: r.chanting_rounds,
+    chantingSessions: Array.isArray(r.chanting_sessions) ? r.chanting_sessions : [],
     hearingMinutes: r.hearing_minutes,
     readingMinutes: r.reading_minutes,
     readingBook: r.reading_book,
