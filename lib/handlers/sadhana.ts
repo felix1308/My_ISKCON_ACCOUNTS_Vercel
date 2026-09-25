@@ -51,13 +51,16 @@ export async function saveSadhanaEntry(params: {
 
   const id = `sad_${owner.id}_${entryDate}`;
 
-  // Chanting sittings: [{time:"05:30", rounds:4}, ...]. When present, the
-  // daily total is the sum of sittings; otherwise the plain total is used.
+  // Chanting sittings: [{time:"05:30"|bucket|"", rounds:4}, ...]. Buckets are
+  // the fixed time blocks used in the portal (before7 / h7_8 / h9_10 / after10).
+  // When sittings exist, the daily total is their sum; otherwise the plain
+  // total field is used.
+  const BUCKETS = new Set(["before7", "h7_8", "h9_10", "after10"]);
   const sessionsIn = Array.isArray(e.chantingSessions) ? e.chantingSessions : [];
   const sessions = sessionsIn.slice(0, 24).map((s) => {
     const o = (s ?? {}) as Record<string, unknown>;
-    const time = str(o.time, 5);
-    return { time: TIME_RE.test(time) ? time : "", rounds: clampInt(o.rounds, 500) };
+    const t = str(o.time, 12);
+    return { time: TIME_RE.test(t) || BUCKETS.has(t) ? t : "", rounds: clampInt(o.rounds, 500) };
   }).filter((s) => s.rounds > 0);
   const chantingRounds = sessions.length > 0
     ? sessions.reduce((sum, s) => sum + s.rounds, 0)

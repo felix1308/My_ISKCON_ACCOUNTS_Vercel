@@ -50,6 +50,25 @@ const TARGET_ROUNDS = 16;
 const TARGET_WAKE = "04:00";
 const LOTUS = "/iskcon-logo.png";
 
+/** The four fixed chanting blocks used by the community. */
+const CHANT_BLOCKS = [
+  { key: "before7", label: "Before 7 am" },
+  { key: "h7_8", label: "7 – 8 am" },
+  { key: "h9_10", label: "9 – 10 am" },
+  { key: "after10", label: "10 am onwards" },
+] as const;
+type BlockKey = (typeof CHANT_BLOCKS)[number]["key"];
+
+/** Fold a legacy free-form HH:MM sitting into the nearest fixed block. */
+function blockOfTime(t: string): BlockKey {
+  const h = toMin(t);
+  if (h === null) return "after10";
+  if (h < 7 * 60) return "before7";
+  if (h < 8 * 60) return "h7_8";
+  if (h < 10 * 60) return "h9_10"; // 8–9 absorbed into the 9–10 block
+  return "after10";
+}
+
 const QUOTES = [
   "Chant Hare Krishna and be happy.",
   "The holy name is the sound incarnation of the Lord.",
@@ -97,7 +116,16 @@ export default function SadhanaPortal() {
 
   useEffect(() => {
     const existing = entries.find((e) => e.entryDate === date);
-    setForm(existing ? { ...EMPTY, ...existing } : { ...EMPTY });
+    if (existing) {
+      // Normalize any legacy free-form times into the four fixed blocks.
+      const sessions = (existing.chantingSessions ?? []).map((s) => ({
+        time: CHANT_BLOCKS.some((b) => b.key === s.time) ? s.time : blockOfTime(s.time),
+        rounds: s.rounds,
+      }));
+      setForm({ ...EMPTY, ...existing, chantingSessions: sessions });
+    } else {
+      setForm({ ...EMPTY });
+    }
     setError("");
   }, [date, entries]);
 
@@ -166,6 +194,19 @@ export default function SadhanaPortal() {
 
   const step = (field: "chantingRounds" | "hearingMinutes" | "readingMinutes" | "serviceMinutes", delta: number, max: number) => {
     setForm((f) => ({ ...f, [field]: Math.max(0, Math.min(max, (f[field] || 0) + delta)) }));
+  };
+
+  const blockRounds = (key: BlockKey) =>
+    form.chantingSessions.filter((s) => s.time === key).reduce((a, s) => a + (s.rounds || 0), 0);
+  const setBlockRounds = (key: BlockKey, rounds: number) => {
+    const r = Math.max(0, Math.min(500, rounds || 0));
+    setForm((f) => ({
+      ...f,
+      chantingSessions: [
+        ...f.chantingSessions.filter((s) => s.time !== key),
+        ...(r > 0 ? [{ time: key as string, rounds: r }] : []),
+      ],
+    }));
   };
 
   return (
@@ -239,32 +280,29 @@ export default function SadhanaPortal() {
                     <h3 className="font-display text-xl font-bold" style={{ color: "#f5e9da" }}>Chanting</h3>
                     <p className="text-xs opacity-60 mb-3">Rounds of the Hare Krishna maha-mantra, sitting by sitting</p>
 
-                    {/* sittings list */}
-                    <div className="space-y-2 mb-2">
-                      {form.chantingSessions.map((s, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <input type="time" value={s.time} aria-label="sitting time"
-                            onChange={(e) => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.map((x, i) => i === idx ? { ...x, time: e.target.value } : x) }))}
-                            className="portal-input" style={{ width: 110 }} />
-                          <button className="portal-stepper" onClick={() => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.map((x, i) => i === idx ? { ...x, rounds: Math.max(0, x.rounds - 1) } : x) }))} aria-label="fewer rounds">−</button>
-                          <input type="number" min={0} aria-label="rounds in sitting"
-                            value={s.rounds || ""} placeholder="0"
-                            onChange={(e) => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.map((x, i) => i === idx ? { ...x, rounds: Math.max(0, Number(e.target.value) || 0) } : x) }))}
-                            className="portal-input text-center" style={{ width: 64 }} />
-                          <button className="portal-stepper" onClick={() => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.map((x, i) => i === idx ? { ...x, rounds: x.rounds + 1 } : x) }))} aria-label="more rounds">+</button>
-                          <span className="text-[10px] opacity-60">rounds</span>
-                          <button onClick={() => setForm((f) => ({ ...f, chantingSessions: f.chantingSessions.filter((_, i) => i !== idx) }))}
-                            className="text-red-300/70 hover:text-red-300 text-lg leading-none ml-1" aria-label="remove sitting">×</button>
-                        </div>
-                      ))}
+                    {/* the four fixed chanting blocks */}
+                    <div className="grid grid-cols-2 gap-2 mb-1">
+                      {CHANT_BLOCKS.map((b) => {
+                        const r = blockRounds(b.key);
+                        return (
+                          <div key={b.key} className="flex items-center justify-between gap-2 rounded-lg px-3 py-2"
+                            style={{ background: r > 0 ? "rgba(201,162,77,0.14)" : "rgba(0,0,0,0.25)", border: "1px solid rgba(201,162,77,0.18)" }}>
+                            <span className="text-xs font-medium" style={{ color: r > 0 ? "#e8c877" : "rgba(245,233,218,0.6)" }}>{b.label}</span>
+                            <div className="flex items-center gap-1.5">
+                              <button className="portal-stepper" style={{ width: 26, height: 26, fontSize: 14 }} onClick={() => setBlockRounds(b.key, r - 1)} aria-label={`fewer rounds ${b.label}`}>−</button>
+                              <input type="number" min={0} value={r || ""} placeholder="0" aria-label={`rounds ${b.label}`}
+                                onChange={(e) => setBlockRounds(b.key, Number(e.target.value) || 0)}
+                                className="portal-input text-center" style={{ width: 52, padding: "4px 6px" }} />
+                              <button className="portal-stepper" style={{ width: 26, height: 26, fontSize: 14 }} onClick={() => setBlockRounds(b.key, r + 1)} aria-label={`more rounds ${b.label}`}>+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <button
-                      onClick={() => setForm((f) => ({ ...f, chantingSessions: [...f.chantingSessions, { time: "", rounds: 0 }] }))}
-                      className="portal-btn-ghost text-xs">+ Add sitting</button>
 
-                    {/* simple total when no sittings are used */}
+                    {/* simple total when nothing is logged in the blocks */}
                     {form.chantingSessions.length === 0 && (
-                      <div className="flex items-center gap-2 mt-3">
+                      <div className="flex items-center gap-2 mt-2">
                         <button className="portal-stepper" onClick={() => step("chantingRounds", -1, 500)} aria-label="fewer rounds">−</button>
                         <input type="number" min={0} className="portal-input text-center" style={{ width: 64 }}
                           value={form.chantingRounds || ""} placeholder="0"
@@ -396,18 +434,24 @@ export default function SadhanaPortal() {
               <div className="portal-card p-6 mb-10 portal-rise" style={{ ["--i" as string]: 11 }}>
                 <h3 className="font-display text-lg font-bold mb-4" style={{ color: "#f5e9da" }}>Recent days</h3>
                 <div className="space-y-2">
-                  {entries.slice(0, 14).map((e) => (
+                  {entries.slice(0, 14).map((e) => {
+                    const blockSplit = CHANT_BLOCKS
+                      .map((b) => (e.chantingSessions ?? []).filter((s) => s.time === b.key).reduce((a, s) => a + (s.rounds || 0), 0))
+                      .join(" · ");
+                    const hasBlocks = (e.chantingSessions ?? []).length > 0;
+                    return (
                     <button key={e.entryDate} onClick={() => { setDate(e.entryDate); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                       className="w-full flex flex-wrap items-center gap-x-4 gap-y-1 text-left px-3 py-2 rounded-lg transition hover:bg-black/25"
                       style={{ border: "1px solid rgba(201,162,77,0.12)" }}>
                       <span className="font-display font-bold text-sm" style={{ color: "#e8c877" }}>{e.entryDate}</span>
-                      <Chip>🙏 {e.chantingRounds || 0}</Chip>
+                      <Chip>🙏 {e.chantingRounds || 0}{hasBlocks ? ` (${blockSplit})` : ""}</Chip>
                       {e.wakeUpAt && <Chip>⏰ {e.wakeUpAt}</Chip>}
                       {e.hearingMinutes > 0 && <Chip>👂 {fmtDur(e.hearingMinutes)}</Chip>}
                       {e.readingMinutes > 0 && <Chip>📖 {fmtDur(e.readingMinutes)}{e.readingBook ? ` · ${e.readingBook}` : ""}</Chip>}
                       {e.serviceMinutes > 0 && <Chip>🤲 {fmtDur(e.serviceMinutes)}{e.serviceNote ? ` · ${e.serviceNote}` : ""}</Chip>}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
