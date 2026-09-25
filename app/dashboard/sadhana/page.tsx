@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { callApi } from "@/lib/client";
 import { SADHANA_BOOKS } from "@/lib/sadhana-books";
@@ -71,19 +71,18 @@ export default function SadhanaPortal() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState("");
   const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
-  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const exitPortal = useCallback(() => {
     if (exiting) return;
-    setExiting(true);
-    exitTimer.current = setTimeout(() => router.push("/dashboard"), 300);
+    setExiting(true);          // fade + pointer-events:none so nothing can get stuck under the overlay
+    router.push("/dashboard"); // navigate immediately; never wait on the animation
   }, [exiting, router]);
 
   // ESC exits the portal
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") exitPortal(); };
     window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); if (exitTimer.current) clearTimeout(exitTimer.current); };
+    return () => window.removeEventListener("keydown", onKey);
   }, [exitPortal]);
 
   const load = useCallback(async () => {
