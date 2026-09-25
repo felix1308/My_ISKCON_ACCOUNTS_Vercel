@@ -363,6 +363,31 @@ CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
 
 -- ---------------------------------------------------------------------------
+-- Sadhana entries — one row per devotee per day. STRICTLY private: rows are
+-- only ever read by their owner (enforced in lib/handlers/sadhana.ts).
+-- The 5 avenues: wake/sleep times, chanting rounds, hearing, reading, service.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sadhana_entries (
+  id               TEXT PRIMARY KEY,
+  principal_id     TEXT NOT NULL,            -- users.id or donors.id
+  principal_type   TEXT NOT NULL DEFAULT 'user',  -- 'user' | 'donor'
+  entry_date       TEXT NOT NULL,            -- YYYY-MM-DD
+  wake_up_at       TEXT NOT NULL DEFAULT '', -- HH:MM
+  sleep_at         TEXT NOT NULL DEFAULT '', -- HH:MM (previous night)
+  chanting_rounds  INT  NOT NULL DEFAULT 0,
+  hearing_minutes  INT  NOT NULL DEFAULT 0,
+  reading_minutes  INT  NOT NULL DEFAULT 0,
+  reading_book     TEXT NOT NULL DEFAULT '',
+  service_minutes  INT  NOT NULL DEFAULT 0,
+  service_note     TEXT NOT NULL DEFAULT '',
+  notes            TEXT NOT NULL DEFAULT '',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (principal_id, principal_type, entry_date)
+);
+CREATE INDEX IF NOT EXISTS idx_sadhana_owner ON sadhana_entries(principal_id, entry_date DESC);
+
+-- ---------------------------------------------------------------------------
 -- updated_at trigger (kept lightweight; one function reused by all tables)
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION set_updated_at()
@@ -379,7 +404,7 @@ BEGIN
   FOR t IN SELECT unnest(ARRAY[
     'temples','centers','departments','department_heads','users','donors',
     'sevas','bookings','bank_accounts','payment_gateways','events',
-    'event_bookings'
+    'event_bookings','sadhana_entries'
   ]) LOOP
     EXECUTE format(
       'DROP TRIGGER IF EXISTS trg_%1$s_updated ON %1$s; '

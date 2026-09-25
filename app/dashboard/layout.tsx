@@ -30,8 +30,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: "My Profile", href: "/dashboard/profile", donorOnly: true },
   // --- All (events) ---
   { label: "Bookings", href: "/dashboard/events", emoji: "🎟️" },
+  // --- All devotees (own sadhana only) ---
+  { label: "Sadhana", href: "/dashboard/sadhana" },
   // --- Admin only ---
-  { label: "Sadhana", href: "/dashboard/sadhana", adminOnly: true },
   { label: "Asset Management", href: "/dashboard/assets", adminOnly: true },
   { label: "Ashram Management", href: "/dashboard/ashram", adminOnly: true },
   { label: "Donors", href: "/dashboard/donors", adminOnly: true, perm: "manage_donors" },
@@ -91,7 +92,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
     // Non-donor items: hide from donors (except dashboard, seva, reports, notice, events)
     if (user.isDonor) {
-      const donorAllowed = ["/dashboard", "/dashboard/bookings", "/dashboard/reports", "/dashboard/notice", "/dashboard/events", "/dashboard/profile"];
+      const donorAllowed = ["/dashboard", "/dashboard/bookings", "/dashboard/reports", "/dashboard/notice", "/dashboard/events", "/dashboard/profile", "/dashboard/sadhana"];
       return donorAllowed.includes(item.href);
     }
 

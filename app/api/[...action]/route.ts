@@ -50,6 +50,7 @@ import {
   handleCancelEventBooking, handleGetEventBookings,
 } from "@/lib/handlers/events";
 import { lookup10BeUrl } from "@/lib/handlers/tenbe";
+import { saveSadhanaEntry, getSadhanaEntries } from "@/lib/handlers/sadhana";
 
 type Handler = (params: Record<string, unknown>, req: Request) => Promise<ApiResult>;
 
@@ -109,6 +110,10 @@ const handlers: Record<string, Handler> = {
   // --- QR / setup / 10BE ---
   validateQR: (p, req) => validateQR(p, req),
   lookup10BeUrl: (p, req) => lookup10BeUrl(p, req),
+
+  // --- Sadhana (strictly own data) ---
+  saveSadhanaEntry: (p, req) => saveSadhanaEntry(p, req),
+  getSadhanaEntries: (p, req) => getSadhanaEntries(p, req),
   flushSevas: (p, req) => flushSevas(p, req),
   toggleSuperadminAccess: (p, req) => toggleSuperadminAccess(p, req),
 
